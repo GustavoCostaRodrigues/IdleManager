@@ -629,14 +629,6 @@ export class AccountCardComponent {
         } catch (err) {
           console.warn(`[AccountCard:${this.config.id}] Falha ao processar telemetria:`, err);
         }
-      } else if (msg.startsWith('POKE_CAPTURE_DATA:')) {
-        try {
-          const rawJson = msg.substring('POKE_CAPTURE_DATA:'.length);
-          const payload = JSON.parse(rawJson);
-          this.autoClickTask.processCaptureEvent(payload);
-        } catch (err) {
-          console.warn(`[AccountCard:${this.config.id}] Falha ao processar captura legada:`, err);
-        }
       }
     });
 
@@ -852,7 +844,9 @@ export class AccountCardComponent {
       case 'CAPTURE': {
         if (!payload.pokemonName || payload.pokemonName.trim().length === 0) return;
 
-        const pokemonName = payload.pokemonName.trim();
+        const rawName = payload.pokemonName.trim();
+        const pokemonName = rawName.replace(/.*(?:Captura|selvagem|Loja|\d)+/gi, '').trim() || rawName;
+        if (pokemonName.toLowerCase().includes('captura') || pokemonName.toLowerCase().includes('selvagem')) return;
         const level = payload.level && payload.level > 0 ? payload.level : 1;
         const isShiny = Boolean(payload.isShiny);
         const pokeball: PokeballType = payload.pokeball || 'pokeball';

@@ -48,9 +48,14 @@ export class CaptureStore {
       if (stored) {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed)) {
-          // Remove quaisquer registros de demonstração anteriores
+          // Remove quaisquer registros de demonstração anteriores ou dados poluídos do DOM
           this.captures = parsed.filter(
-            (item: CaptureRecord) => !item.id.startsWith('cap-demo-'),
+            (item: CaptureRecord) =>
+              !item.id.startsWith('cap-demo-') &&
+              !item.pokemonName.includes('Captura') &&
+              !item.pokemonName.includes('selvagem') &&
+              !item.pokemonName.includes('Loja') &&
+              !(item.iv && item.iv.total === 0 && item.iv.percentage === 0 && !item.gameRecordId),
           );
           return;
         }
@@ -103,9 +108,18 @@ export class CaptureStore {
   /**
    * Adiciona um novo registro de captura REAL no topo da tabela de forma fluida e reativa.
    */
+  /**
+   * Adiciona um novo registro de captura REAL no topo da tabela de forma fluida e reativa.
+   */
   public addCapture(
     data: Omit<CaptureRecord, 'id' | 'timestamp'> & { timestamp?: number; gameRecordId?: string },
   ): CaptureRecord {
+    const rawName = data.pokemonName.trim();
+    const cleanName = rawName.replace(/.*(?:Captura|selvagem|Loja|\d)+/gi, '').trim() || rawName;
+    if (cleanName.toLowerCase().includes('captura') || cleanName.toLowerCase().includes('selvagem')) {
+      return null as any;
+    }
+
     const ts = data.timestamp ?? Date.now();
 
     // Evita duplicatas se um registro com o mesmo ID do jogo ou mesmo pokemon/horário já existir
@@ -113,7 +127,7 @@ export class CaptureStore {
       (c) =>
         (data.gameRecordId && c.gameRecordId === data.gameRecordId) ||
         (c.accountId === data.accountId &&
-          c.pokemonName.toLowerCase() === data.pokemonName.toLowerCase() &&
+          c.pokemonName.toLowerCase() === cleanName.toLowerCase() &&
           Math.abs(c.timestamp - ts) < 2500),
     );
     if (existing) {
@@ -122,6 +136,7 @@ export class CaptureStore {
 
     const record: CaptureRecord = {
       ...data,
+      pokemonName: cleanName,
       id: `cap-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`,
       timestamp: ts,
     };
@@ -149,6 +164,7 @@ export class CaptureStore {
     records: Array<{
       id?: string;
       pokemonName: string;
+      pokemonDexNumber?: number;
       level?: number;
       quality?: PokemonQuality;
       pokeball?: PokeballType;
@@ -162,23 +178,36 @@ export class CaptureStore {
     let hasNew = false;
     for (const item of records) {
       if (!item.pokemonName || item.pokemonName.trim().length === 0) continue;
+      const rawName = item.pokemonName.trim();
+      const cleanName = rawName.replace(/.*(?:Captura|selvagem|Loja|\d)+/gi, '').trim() || rawName;
+      if (cleanName.toLowerCase().includes('captura') || cleanName.toLowerCase().includes('selvagem')) continue;
+
       const ts = item.timestamp || Date.now();
+
+      // Se já houver um registro provisório sem gameRecordId nessa conta e horário similar, remove para dar lugar ao oficial
+      const provisionalIdx = this.captures.findIndex(
+        (c) => !c.gameRecordId && c.accountId === accountId && Math.abs(c.timestamp - ts) < 4000,
+      );
+      if (provisionalIdx !== -1) {
+        this.captures.splice(provisionalIdx, 1);
+        hasNew = true;
+      }
 
       // Evita duplicatas se o mesmo registro já existir
       const exists = this.captures.some(
         (c) =>
           (item.id && c.gameRecordId === item.id) ||
           (c.accountId === accountId &&
-            c.pokemonName.toLowerCase() === item.pokemonName.toLowerCase() &&
+            c.pokemonName.toLowerCase() === cleanName.toLowerCase() &&
             Math.abs(c.timestamp - ts) < 3000),
       );
 
       if (!exists) {
         let iv: IVStats;
-        if (typeof item.ivPercentage === 'number') {
-          iv = CaptureStore.createIVFromPercentage(item.ivPercentage);
-        } else if (typeof item.ivPoints === 'number') {
+        if (typeof item.ivPoints === 'number' && item.ivPoints > 0) {
           iv = CaptureStore.calculateIVStats(item.ivPoints, item.ivMaxPoints || 192);
+        } else if (typeof item.ivPercentage === 'number') {
+          iv = CaptureStore.createIVFromPercentage(item.ivPercentage);
         } else {
           iv = CaptureStore.createIVFromPercentage(0);
         }
@@ -189,7 +218,8 @@ export class CaptureStore {
           timestamp: ts,
           accountId,
           accountName,
-          pokemonName: item.pokemonName,
+          pokemonName: cleanName,
+          pokemonDexNumber: item.pokemonDexNumber,
           quality: item.quality || 'comum',
           pokeball: item.pokeball || 'pokeball',
           iv,

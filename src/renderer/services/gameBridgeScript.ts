@@ -682,49 +682,18 @@ export const GAME_BRIDGE_INJECTION_SCRIPT = `
     function handleIncomingWsMessage(msg) {
       if (!msg || typeof msg !== 'object') return;
 
-      // A) Confirmação definitiva de captura em tempo real (catch-result)
+      // A) Confirmação definitiva de captura com sucesso em tempo real (catch-result)
       if (msg.type === 'catch-result') {
         if (msg.success) {
-          const spName = msg.speciesName || 'Pokémon';
-          const bName = msg.ballName || 'Poké Ball';
-          emitTelemetry({
-            type: 'CAPTURE',
-            pokemonName: spName,
-            pokeball: normalizePokeball(bName),
-            level: 1,
-            quality: 'comum',
-            ivPercentage: 0,
-            isShiny: false,
-            timestamp: Date.now(),
-          });
-
-          // Agenda sincronização debounced do log oficial para pegar IV exato e qualidade
-          scheduleLogSync(700);
+          // Captura confirmada com sucesso pelo servidor! Sincroniza imediatamente o histórico oficial com IV e dados reais
+          scheduleLogSync(200);
         }
         return;
       }
 
       // B) Evento de novo Pokémon inserido no time/box (poke-delta)
       if (msg.type === 'poke-delta' && msg.poke) {
-        const p = msg.poke;
-        if (p.name || p.speciesId) {
-          const q = qualityFromNumberOrString(p.quality);
-          const ivPts = typeof p.ivTotal === 'number' ? p.ivTotal : 0;
-          const ivPct = ivPts > 0 ? Math.round((ivPts / 192) * 100 * 10) / 10 : 0;
-          emitTelemetry({
-            type: 'CAPTURE',
-            pokemonName: p.name || 'Pokémon',
-            pokemonDexNumber: p.speciesId,
-            level: p.level || 1,
-            isShiny: Boolean(p.shiny),
-            quality: q,
-            ivPoints: ivPts,
-            ivMaxPoints: 192,
-            ivPercentage: ivPct,
-            timestamp: Date.now(),
-          });
-          scheduleLogSync(1200);
-        }
+        scheduleLogSync(300);
         return;
       }
 
@@ -750,7 +719,7 @@ export const GAME_BRIDGE_INJECTION_SCRIPT = `
     let logSyncTimeout = null;
     let lastLogSyncTime = 0;
 
-    function scheduleLogSync(delayMs = 1000) {
+    function scheduleLogSync(delayMs = 300) {
       if (logSyncTimeout) clearTimeout(logSyncTimeout);
       logSyncTimeout = setTimeout(() => {
         logSyncTimeout = null;
@@ -760,7 +729,7 @@ export const GAME_BRIDGE_INJECTION_SCRIPT = `
 
     async function fetchCaptureLogSafely() {
       const now = Date.now();
-      if (now - lastLogSyncTime < 3000) return;
+      if (now - lastLogSyncTime < 800) return;
       lastLogSyncTime = now;
 
       try {
@@ -788,9 +757,11 @@ export const GAME_BRIDGE_INJECTION_SCRIPT = `
         const list = data.rows.map((row) => {
           const ivPts = typeof row.ivTotal === 'number' ? row.ivTotal : 0;
           const ivPct = ivPts > 0 ? Math.round((ivPts / 192) * 100 * 10) / 10 : 0;
+          const rawName = String(row.name || 'Pokémon').trim();
+          const cleanName = rawName.replace(/.*(?:Captura|selvagem|Loja|\\d)+/gi, '').trim() || rawName;
           return {
             id: String(row.id || ''),
-            pokemonName: row.name || 'Pokémon',
+            pokemonName: cleanName,
             pokemonDexNumber: row.speciesId,
             level: row.level || 1,
             quality: qualityFromNumberOrString(row.quality),
@@ -808,42 +779,6 @@ export const GAME_BRIDGE_INJECTION_SCRIPT = `
           captures: list,
           timestamp: Date.now(),
         });
-      } catch (_) {}
-    }
-
-    // -------------------------------------------------------------
-    // 4. OBSERVADOR PASSIVO DO HUD DA TELA (FALLBACK PARA FLASH DE CAPTURA)
-    // -------------------------------------------------------------
-    function scanDomCaptureFlashes() {
-      try {
-        const docs = getBridgeDocs();
-        for (const doc of docs) {
-          const elements = doc.querySelectorAll('.cap-panel, [class*="flash"], [class*="toast"], [class*="alert"]');
-          for (const el of elements) {
-            const text = (el.textContent || '').trim();
-            if (text.includes('capturado com') || text.includes('captured with')) {
-              const match = text.match(/(?:🎉\s*)?([A-Za-z0-9À-ÿ\s\-]+?)\s+(?:capturado com|captured with)\s+([A-Za-z0-9À-ÿ\s\-!]+)/i);
-              if (match) {
-                const species = match[1].trim();
-                const ball = match[2].replace('!', '').trim();
-                const sig = 'FLASH_CAP:' + species + ':' + ball;
-                if (shouldEmit(sig, 3000)) {
-                  emitTelemetry({
-                    type: 'CAPTURE',
-                    pokemonName: species,
-                    pokeball: normalizePokeball(ball),
-                    level: 1,
-                    quality: 'comum',
-                    ivPercentage: 0,
-                    isShiny: false,
-                    timestamp: Date.now(),
-                  });
-                  scheduleLogSync(700);
-                }
-              }
-            }
-          }
-        }
       } catch (_) {}
     }
 
@@ -906,7 +841,6 @@ export const GAME_BRIDGE_INJECTION_SCRIPT = `
       scanActiveCapturePanel();
       scanActivePotionSupply();
       scanHuntAnalyzer();
-      scanDomCaptureFlashes();
 
       // Sincronização inicial oficial ao detectar login
       if (!window.__POKE_LOG_INITIAL_SYNCED__ && isGamePageLoggedIn(getBridgeDocs())) {

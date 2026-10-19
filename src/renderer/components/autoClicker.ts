@@ -254,51 +254,10 @@ export class AutoClickTask {
   }
 
   /**
-   * Processa o evento de captura e insere o registro no topo de CaptureStore
-   * EXCLUSIVAMENTE quando dados reais forem extraídos do jogo.
-   * Se os dados estiverem ausentes, NÃO cria registro falso.
+   * Mantido para compatibilidade de tipagem, mas não insere capturas sintéticas.
+   * Todas as capturas autênticas vêm exclusivamente da confirmação oficial do jogo.
    */
-  public processCaptureEvent(extracted?: ExtractedCaptureData): void {
-    if (!extracted || !extracted.pokemonName || extracted.pokemonName.trim().length === 0) {
-      // Sem dados reais de Pokémon: NÃO gera nenhum registro falso!
-      return;
-    }
-
-    const pokemonName = extracted.pokemonName.trim();
-    const level = extracted.level && extracted.level > 0 ? extracted.level : 1;
-    const isShiny = Boolean(extracted.isShiny);
-    const pokeball: PokeballType = extracted.pokeball || 'pokeball';
-    const quality: PokemonQuality = extracted.quality || 'comum';
-
-    // Se o jogo expôs porcentagem ou pontos de IV, calcula os stats reais. Caso contrário, 0% sem inventar números.
-    let iv: IVStats;
-    if (typeof extracted.ivPercentage === 'number') {
-      iv = CaptureStore.createIVFromPercentage(extracted.ivPercentage);
-    } else if (typeof extracted.ivPoints === 'number') {
-      iv = CaptureStore.calculateIVStats(extracted.ivPoints);
-    } else {
-      iv = {
-        percentage: 0,
-        total: 0,
-        maxPossible: 45,
-        tier: 'C',
-      };
-    }
-
-    // Registra na telemetria da hunt com os dados reais
-    HuntStore.getInstance().recordPokemonCatch(this.accountId, true, pokemonName);
-
-    // Adiciona o novo registro real no topo da tabela do CaptureStore
-    CaptureStore.getInstance().addCapture({
-      accountId: this.accountId,
-      accountName: this.accountName,
-      pokemonName,
-      pokemonDexNumber: extracted.pokemonDexNumber,
-      quality,
-      pokeball,
-      iv,
-      level,
-      isShiny,
-    });
+  public processCaptureEvent(_extracted?: ExtractedCaptureData): void {
+    // Vazio propositalmente: nenhuma captura é registrada por mero clique em botão!
   }
 }

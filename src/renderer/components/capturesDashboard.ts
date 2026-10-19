@@ -207,12 +207,12 @@ export class CapturesDashboardComponent {
             <table class="captures-table">
               <thead>
                 <tr>
-                  <th style="width: 15%;">Data / Hora</th>
-                  <th style="width: 16%;">Conta (Slot)</th>
-                  <th style="width: 23%;">Pokémon</th>
+                  <th style="width: 15%;">Conta (Slot)</th>
+                  <th style="width: 25%;">Pokémon</th>
                   <th style="width: 16%;">Pokébola Usada</th>
                   <th style="width: 15%;">Qualidade</th>
-                  <th style="width: 15%;">IV do Pokémon</th>
+                  <th style="width: 14%;">IV do Pokémon</th>
+                  <th style="width: 15%; text-align: right;">Data / Hora</th>
                 </tr>
               </thead>
               <tbody id="captures-table-body">
@@ -377,29 +377,33 @@ export class CapturesDashboardComponent {
       // 2. Conta (Slot)
       const slotNumber = record.accountId.replace('account_0', '').replace('account_', '');
 
-      // 3. Qualidade Oficial do Poke Idle World
+      // 3. Nome e Sprite Real do Pokémon
+      const rawName = record.pokemonName.trim();
+      const cleanName = rawName.replace(/.*(?:Captura|selvagem|Loja|\d)+/gi, '').trim() || rawName;
+      const dexNum = record.pokemonDexNumber;
+      const spriteUrl = dexNum
+        ? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${record.isShiny ? 'shiny/' : ''}${dexNum}.png`
+        : '';
+      const fallbackOutfitUrl = dexNum
+        ? `https://poke.idleworld.online/assets/pokemon/outfit_${dexNum}_.png`
+        : '';
+
+      // 4. Qualidade Oficial do Poke Idle World
       const qualityClass = `quality-${record.quality.toLowerCase()}`;
       const qualityDisplayName = QUALITY_DISPLAY_NAMES[record.quality] || record.quality;
 
-      // 4. Pokébola com SVG nítido
+      // 5. Pokébola com SVG nítido
       const pokeballHtml = this.getPokeballMarkup(record.pokeball);
 
-      // 5. IV do Pokémon
-      const isPerfect = record.iv.percentage >= 100;
+      // 6. IV do Pokémon em x/192
+      const ivPoints = record.iv.total;
+      const isPerfect = record.iv.percentage >= 100 || ivPoints >= 192;
       const tierClass = `tier-${record.iv.tier.toLowerCase()}${isPerfect ? ' perfect' : ''}`;
       const fillClass = `fill-${record.iv.tier.toLowerCase()}${isPerfect ? ' fill-perfect' : ''}`;
-      const tierLabel = isPerfect ? 'PERFEITO 100%' : `TIER ${record.iv.tier}`;
+      const tierLabel = isPerfect ? 'PERFEITO' : `TIER ${record.iv.tier}`;
 
       row.innerHTML = `
-        <!-- 1. DATA / HORA -->
-        <td class="col-time">
-          <div class="time-cell">
-            <span class="time-exact">${timeFormatted.exact}</span>
-            <span class="time-relative">${timeFormatted.relative}</span>
-          </div>
-        </td>
-
-        <!-- 2. CONTA (SLOT) -->
+        <!-- 1. CONTA (SLOT) -->
         <td class="col-account">
           <div class="account-slot-cell" title="Conta: ${record.accountName} (${record.accountId})">
             <span class="account-badge-slot">0${slotNumber}</span>
@@ -410,19 +414,29 @@ export class CapturesDashboardComponent {
           </div>
         </td>
 
-        <!-- 3. POKÉMON -->
+        <!-- 2. POKÉMON COM SPRITE REAL À ESQUERDA -->
         <td class="col-pokemon">
           <div class="pokemon-cell">
             <div class="pokemon-avatar-box">
-              <svg viewBox="0 0 24 24" class="pokemon-dex-svg" fill="none" stroke="currentColor" stroke-width="1.8">
-                <circle cx="12" cy="12" r="9"/>
-                <circle cx="12" cy="12" r="3"/>
-                <path d="M3 12h6m6 0h6"/>
-              </svg>
+              ${spriteUrl ? `
+                <img 
+                  src="${spriteUrl}" 
+                  alt="${cleanName}" 
+                  class="pokemon-sprite-img" 
+                  loading="lazy"
+                  onerror="this.onerror=null; ${fallbackOutfitUrl ? `this.src='${fallbackOutfitUrl}';` : `this.style.display='none';`}"
+                />
+              ` : `
+                <svg viewBox="0 0 24 24" class="pokemon-dex-svg" fill="none" stroke="currentColor" stroke-width="1.8">
+                  <circle cx="12" cy="12" r="9"/>
+                  <circle cx="12" cy="12" r="3"/>
+                  <path d="M3 12h6m6 0h6"/>
+                </svg>
+              `}
             </div>
             <div class="pokemon-meta-info">
               <div class="pokemon-name-row">
-                <strong class="pokemon-title">${record.pokemonName}</strong>
+                <strong class="pokemon-title">${cleanName}</strong>
                 ${record.isShiny ? '<span class="pokemon-shiny-star" title="Pokémon Shiny!">✨</span>' : ''}
               </div>
               <div class="pokemon-sub-info">
@@ -433,14 +447,14 @@ export class CapturesDashboardComponent {
           </div>
         </td>
 
-        <!-- 4. POKÉBOLA USADA -->
+        <!-- 3. POKÉBOLA USADA -->
         <td class="col-pokeball">
           <div class="pokeball-cell">
             ${pokeballHtml}
           </div>
         </td>
 
-        <!-- 5. QUALIDADE DO POKÉMON (OFICIAL DO POKE IDLE WORLD) -->
+        <!-- 4. QUALIDADE DO POKÉMON (OFICIAL DO POKE IDLE WORLD) -->
         <td class="col-quality">
           <span class="quality-badge ${qualityClass}">
             ${record.isShiny ? '<span style="font-size: 11px; margin-right: 4px;">✨</span>' : ''}
@@ -448,16 +462,24 @@ export class CapturesDashboardComponent {
           </span>
         </td>
 
-        <!-- 6. IV DO POKÉMON -->
+        <!-- 5. IV DO POKÉMON EM x/192 -->
         <td class="col-iv">
-          <div class="iv-cell" title="IV Total: ${record.iv.total}/${record.iv.maxPossible} pontos (${record.iv.percentage}%)">
+          <div class="iv-cell" title="IV Total: ${ivPoints}/192 pontos (${record.iv.percentage}%)">
             <div class="iv-header-row">
-              <span class="iv-value-text">${record.iv.percentage.toFixed(1)}%</span>
+              <span class="iv-value-text">${ivPoints}/192</span>
               <span class="iv-tier-badge ${tierClass}">${tierLabel}</span>
             </div>
             <div class="iv-progress-track">
               <div class="iv-progress-fill ${fillClass}" style="width: ${Math.min(100, record.iv.percentage)}%;"></div>
             </div>
+          </div>
+        </td>
+
+        <!-- 6. DATA / HORA (ÚLTIMO ITEM MAIS À DIREITA) -->
+        <td class="col-time">
+          <div class="time-cell">
+            <span class="time-exact">${timeFormatted.exact}</span>
+            <span class="time-relative">${timeFormatted.relative}</span>
           </div>
         </td>
       `;

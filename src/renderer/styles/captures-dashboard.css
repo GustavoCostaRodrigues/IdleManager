@@ -590,11 +590,16 @@
    ESTILOS DAS COLUNAS INDIVIDUAIS
    ========================================================== */
 
-/* Coluna 1: Data / Hora */
+/* Coluna: Data / Hora */
+.col-time {
+  text-align: right;
+}
+
 .time-cell {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  align-items: flex-end;
 }
 
 .time-exact {
@@ -673,6 +678,13 @@
   width: 20px;
   height: 20px;
   color: var(--text-secondary);
+}
+
+.pokemon-sprite-img {
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+  image-rendering: pixelated;
 }
 
 .pokemon-meta-info {
