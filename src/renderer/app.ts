@@ -1,8 +1,10 @@
+import type { CaptureRecord } from '../shared/captureTypes.js';
 import { AccountManager } from './components/accountManager.js';
 import { CapturesDashboardComponent } from './components/capturesDashboard.js';
 import { HuntDashboardComponent } from './components/huntDashboard.js';
 import { TitleBarComponent } from './components/titleBar.js';
 import { ToastManager } from './components/toast.js';
+import { CaptureStore } from './services/captureStore.js';
 
 class PokeIdleApp {
   private accountManager!: AccountManager;
@@ -17,6 +19,9 @@ class PokeIdleApp {
   private navAccountsBtn!: HTMLElement;
   private navLogsBtn!: HTMLElement;
   private navCapturesBtn!: HTMLElement;
+
+  private currentView: 'accounts' | 'hunt' | 'captures' = 'accounts';
+  private lastAlertedCaptureId: string | null = null;
 
   constructor() {
     this.init();
@@ -60,6 +65,7 @@ class PokeIdleApp {
     this.setupDrawer();
     this.setupSettingsModal();
     this.setupEmergencyListeners();
+    this.setupLegendaryCaptureWatcher();
   }
 
   private setupDrawer(): void {
@@ -79,6 +85,7 @@ class PokeIdleApp {
     });
 
     this.navCapturesBtn?.addEventListener('click', () => {
+      this.clearLegendaryAlert();
       this.switchView('captures');
     });
 
@@ -92,6 +99,8 @@ class PokeIdleApp {
   }
 
   private switchView(view: 'accounts' | 'hunt' | 'captures'): void {
+    this.currentView = view;
+
     // Remove classe ativa de todos os botões de navegação
     this.navAccountsBtn.classList.remove('active');
     this.navLogsBtn.classList.remove('active');
@@ -109,9 +118,73 @@ class PokeIdleApp {
       this.navLogsBtn.classList.add('active');
       this.huntViewport.classList.add('active');
     } else if (view === 'captures') {
+      this.clearLegendaryAlert();
       this.navCapturesBtn.classList.add('active');
       this.capturesViewport.classList.add('active');
     }
+  }
+
+  /**
+   * Monitora em tempo real novas capturas emitidas pelo CaptureStore.
+   * Quando um Lendário com IV 120+ for capturado, ativa um indicador pulsante no botão do drawer!
+   */
+  private setupLegendaryCaptureWatcher(): void {
+    const store = CaptureStore.getInstance();
+    let initialSyncDone = false;
+
+    store.subscribe((captures) => {
+      if (!captures || captures.length === 0) return;
+
+      // Na primeira carga, grava o ID do topo para não alertar registros prévios do histórico
+      if (!initialSyncDone) {
+        initialSyncDone = true;
+        this.lastAlertedCaptureId = captures[0]?.id || null;
+        return;
+      }
+
+      const top = captures[0];
+      if (!top || top.id === this.lastAlertedCaptureId) return;
+
+      const q = (top.quality || '').toLowerCase();
+      const isLegendaryQuality =
+        q === 'lendaria' || q === 'mitica' || q === 'ancia' || q === 'divina';
+      const ivPoints = top.iv ? top.iv.total : 0;
+
+      // Se for Lendário (ou superior) com IV 120+:
+      if (isLegendaryQuality && ivPoints >= 120) {
+        this.lastAlertedCaptureId = top.id;
+
+        // Se o usuário não estiver com a tela de capturas aberta, ativa o indicador pulsante no drawer!
+        if (this.currentView !== 'captures') {
+          this.triggerLegendaryAlert(top);
+        }
+      }
+    });
+  }
+
+  private triggerLegendaryAlert(record: CaptureRecord): void {
+    if (!this.navCapturesBtn) return;
+    this.navCapturesBtn.classList.add('pulse-legendary');
+
+    let badge = this.navCapturesBtn.querySelector('.nav-legendary-badge');
+    if (!badge) {
+      badge = document.createElement('span');
+      badge.className = 'nav-legendary-badge';
+      this.navCapturesBtn.appendChild(badge);
+    }
+
+    this.toastManager.show(
+      `⭐ LENDÁRIO CAPTURADO! ${record.pokemonName} (${record.iv.total}/192 IV) na Conta ${record.accountName}!`,
+      'success',
+      8000,
+    );
+  }
+
+  private clearLegendaryAlert(): void {
+    if (!this.navCapturesBtn) return;
+    this.navCapturesBtn.classList.remove('pulse-legendary');
+    const badge = this.navCapturesBtn.querySelector('.nav-legendary-badge');
+    if (badge) badge.remove();
   }
 
   private navigateToAccount(accountId: string): void {
