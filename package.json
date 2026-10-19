@@ -1,0 +1,26 @@
+{
+  "name": "poke-idle-manager",
+  "productName": "Poke Idle Manager",
+  "version": "0.1.0",
+  "description": "Gerenciador desktop multiplataforma para até 4 contas simultâneas de Poke Idle World, com sessões isoladas e auto-click individual.",
+  "main": "dist/main/main.js",
+  "private": true,
+  "license": "UNLICENSED",
+  "author": "Gustavo",
+  "scripts": {
+    "dev": "node scripts/build.mjs --watch",
+    "start": "node scripts/build.mjs && electron .",
+    "build": "node scripts/build.mjs --production",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "dist": "npm run typecheck && npm run build && electron-builder",
+    "dist:mac": "npm run typecheck && npm run build && electron-builder --mac",
+    "dist:win": "npm run typecheck && npm run build && electron-builder --win"
+  },
+  "devDependencies": {
+    "@types/node": "^22.18.0",
+    "electron": "^44.9.0",
+    "electron-builder": "^26.15.3",
+    "esbuild": "^0.28.2",
+    "typescript": "^5.9.3"
+  }
+}

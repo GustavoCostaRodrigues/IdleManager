@@ -1,0 +1,225 @@
+.titlebar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: var(--titlebar-height);
+  background-color: var(--bg-base);
+  border-bottom: 1px solid var(--border-subtle);
+  padding: 0 12px;
+  user-select: none;
+  -webkit-app-region: drag;
+  z-index: 1000;
+  position: relative;
+}
+
+/* Área esquerda: Logo e título */
+.titlebar-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  -webkit-app-region: no-drag;
+}
+
+/* Espaçador para os botões nativos do macOS se necessário */
+body.platform-darwin .titlebar-left {
+  margin-left: 70px;
+}
+
+.titlebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.brand-icon {
+  width: 20px;
+  height: 20px;
+  color: var(--accent-primary);
+  filter: drop-shadow(0 0 6px var(--accent-glow));
+}
+
+.brand-title {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--text-primary);
+  text-transform: uppercase;
+}
+
+.brand-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 6px;
+  background-color: rgba(88, 166, 255, 0.12);
+  color: var(--accent-primary);
+  border: 1px solid rgba(88, 166, 255, 0.3);
+  border-radius: var(--radius-sm);
+}
+
+/* Área central: Switch de Layout e Métricas */
+.titlebar-center {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  -webkit-app-region: no-drag;
+}
+
+.layout-switcher {
+  display: flex;
+  align-items: center;
+  background-color: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 3px;
+  gap: 2px;
+}
+
+.layout-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transform: translateZ(0);
+  will-change: background-color, color;
+  transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+
+.layout-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.layout-btn:hover {
+  color: var(--text-primary);
+  background-color: var(--surface-elevated);
+}
+
+.layout-btn.active {
+  background-color: rgba(88, 166, 255, 0.18);
+  color: var(--accent-primary);
+  font-weight: 600;
+}
+
+/* Métricas do Sistema */
+.system-metrics {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-secondary);
+  background-color: rgba(22, 27, 34, 0.6);
+  padding: 4px 10px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  contain: layout style;
+  transform: translateZ(0);
+}
+
+.metric-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.metric-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--status-active);
+}
+
+/* Área direita: Parada de Emergência e Controles da Janela */
+.titlebar-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  -webkit-app-region: no-drag;
+}
+
+.btn-emergency-stop {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background-color: rgba(248, 81, 73, 0.12);
+  border: 1px solid rgba(248, 81, 73, 0.35);
+  color: #ff7b72;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transform: translateZ(0);
+  will-change: background-color, border-color;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.btn-emergency-stop svg {
+  width: 13px;
+  height: 13px;
+}
+
+.btn-emergency-stop .shortcut-hint {
+  font-size: 9px;
+  padding: 1px 4px;
+  background-color: rgba(248, 81, 73, 0.2);
+  border-radius: 3px;
+  color: #ff9992;
+}
+
+.btn-emergency-stop:hover {
+  background-color: rgba(248, 81, 73, 0.25);
+  border-color: #f85149;
+}
+
+.btn-emergency-stop:active {
+  background-color: rgba(248, 81, 73, 0.35);
+}
+
+/* Controles de Janela (Windows / Linux) */
+.window-controls {
+  display: flex;
+  align-items: center;
+  margin-left: 6px;
+}
+
+body.platform-darwin .window-controls {
+  display: none; /* macOS usa botões nativos à esquerda */
+}
+
+.window-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 28px;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
+}
+
+.window-btn svg {
+  width: 13px;
+  height: 13px;
+}
+
+.window-btn:hover {
+  background-color: var(--surface-elevated);
+  color: var(--text-primary);
+}
+
+.window-btn.btn-close:hover {
+  background-color: var(--status-danger);
+  color: #ffffff;
+}

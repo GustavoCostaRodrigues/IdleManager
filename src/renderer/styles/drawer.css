@@ -1,0 +1,143 @@
+.drawer {
+  width: var(--drawer-width);
+  min-width: var(--drawer-width);
+  height: 100%;
+  background-color: var(--surface-card);
+  border-right: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 0;
+  user-select: none;
+  z-index: 50;
+  contain: layout style paint;
+  transform: translateZ(0);
+}
+
+.drawer-top {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+}
+
+.drawer-logo-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
+  background: radial-gradient(circle at center, rgba(88, 166, 255, 0.15), transparent 70%);
+  margin-bottom: 6px;
+  contain: strict;
+  transform: translateZ(0);
+}
+
+.drawer-logo {
+  width: 26px;
+  height: 26px;
+  color: var(--accent-primary);
+}
+
+.drawer-nav {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 0 10px;
+}
+
+.nav-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transform: translateZ(0);
+  will-change: background-color, border-color, color;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+}
+
+.nav-item svg {
+  width: 20px;
+  height: 20px;
+  transition: color var(--transition-fast);
+}
+
+.nav-item:hover:not(.disabled) {
+  color: var(--text-primary);
+  background-color: var(--surface-elevated);
+  border-color: var(--border-subtle);
+}
+
+.nav-item.active {
+  color: var(--accent-primary);
+  background-color: rgba(88, 166, 255, 0.12);
+  border-color: rgba(88, 166, 255, 0.35);
+}
+
+/* Indicador de item ativo na lateral */
+.nav-item.active::before {
+  content: '';
+  position: absolute;
+  left: -10px;
+  width: 3px;
+  height: 20px;
+  background-color: var(--accent-primary);
+  border-radius: 0 3px 3px 0;
+}
+
+/* Itens desativados (Mercado) */
+.nav-item.disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* Tooltip simples acelerado */
+.nav-item[data-tooltip] {
+  position: relative;
+}
+
+.nav-item[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: calc(100% + 10px);
+  top: 50%;
+  transform: translateY(-50%) translateZ(0);
+  background-color: var(--surface-elevated);
+  color: var(--text-primary);
+  padding: 5px 9px;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  border: 1px solid var(--border-subtle);
+  transition: opacity var(--transition-fast);
+  z-index: 100;
+  contain: layout style paint;
+}
+
+.nav-item:hover::after {
+  opacity: 1;
+}
+
+/* Rodapé do Drawer */
+.drawer-bottom {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  padding: 0 10px;
+}

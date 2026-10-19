@@ -1,0 +1,650 @@
+/* ==========================================================
+   DASHBOARD DA HUNT (PAINEL FINANCEIRO)
+   ========================================================== */
+
+.hunt-viewport {
+  display: none;
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  background-color: var(--bg-base);
+  overflow-y: auto;
+  padding: 16px 20px;
+  animation: fade-in 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.hunt-viewport.active {
+  display: flex;
+  flex-direction: column;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.hunt-dashboard-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+/* ==========================================================
+   CABEÇALHO DO DASHBOARD
+   ========================================================== */
+
+.hunt-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 4px;
+}
+
+.hunt-header-title-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.hunt-badge-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  color: var(--status-active);
+  background-color: rgba(63, 185, 80, 0.12);
+  border: 1px solid rgba(63, 185, 80, 0.3);
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  width: fit-content;
+}
+
+.live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--status-active);
+  box-shadow: 0 0 6px var(--status-active-glow);
+  animation: pulse-live 1.5s infinite alternate;
+}
+
+@keyframes pulse-live {
+  0% { transform: scale(0.9); opacity: 0.7; }
+  100% { transform: scale(1.3); opacity: 1; }
+}
+
+.hunt-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.3px;
+}
+
+.hunt-subtitle {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.hunt-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.btn-hunt-action {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background-color: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-hunt-action svg {
+  width: 14px;
+  height: 14px;
+  color: var(--accent-primary);
+}
+
+.btn-hunt-action:hover {
+  background-color: var(--surface-elevated);
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 8px var(--accent-glow);
+  transform: translateY(-1px);
+}
+
+.btn-hunt-action.btn-danger-action {
+  color: #ff9992;
+  border-color: rgba(248, 81, 73, 0.3);
+}
+
+.btn-hunt-action.btn-danger-action svg {
+  color: #f85149;
+}
+
+.btn-hunt-action.btn-danger-action:hover {
+  background-color: rgba(248, 81, 73, 0.15);
+  border-color: #f85149;
+  box-shadow: 0 0 8px var(--status-danger-glow);
+}
+
+/* ==========================================================
+   CARDS DE RESUMO NO TOPO (KPIS)
+   ========================================================== */
+
+.hunt-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+}
+
+.kpi-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  background-color: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  position: relative;
+  overflow: hidden;
+  transition: all var(--transition-fast);
+}
+
+.kpi-card:hover {
+  border-color: rgba(88, 166, 255, 0.4);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+}
+
+.kpi-icon-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: var(--radius-md);
+  flex-shrink: 0;
+}
+
+.kpi-icon-wrapper svg {
+  width: 20px;
+  height: 20px;
+}
+
+.potions-icon {
+  background-color: rgba(248, 81, 73, 0.12);
+  color: #ff7b72;
+  border: 1px solid rgba(248, 81, 73, 0.25);
+}
+
+.loot-icon {
+  background-color: rgba(210, 153, 34, 0.12);
+  color: #e3b341;
+  border: 1px solid rgba(210, 153, 34, 0.25);
+}
+
+.catches-icon {
+  background-color: rgba(63, 185, 80, 0.12);
+  color: #56d364;
+  border: 1px solid rgba(63, 185, 80, 0.25);
+}
+
+.profit-icon {
+  background-color: rgba(88, 166, 255, 0.12);
+  color: var(--accent-primary);
+  border: 1px solid rgba(88, 166, 255, 0.25);
+}
+
+.kpi-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
+}
+
+.kpi-header-with-timer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.kpi-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.session-timer-badge {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  background-color: var(--bg-base);
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+}
+
+.kpi-value-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.kpi-main-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.5px;
+}
+
+.kpi-main-value.gold {
+  color: #e3b341;
+}
+
+.kpi-main-value.success {
+  color: #56d364;
+}
+
+.kpi-main-value.highlight {
+  color: #56d364;
+  text-shadow: 0 0 10px rgba(86, 211, 100, 0.3);
+}
+
+.kpi-main-value.negative {
+  color: #ff7b72;
+}
+
+.kpi-sub-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+}
+
+.kpi-sub-badge.danger {
+  background-color: rgba(248, 81, 73, 0.15);
+  color: #ff9992;
+  border: 1px solid rgba(248, 81, 73, 0.3);
+}
+
+.kpi-sub-badge.gold {
+  background-color: rgba(210, 153, 34, 0.15);
+  color: #e3b341;
+  border: 1px solid rgba(210, 153, 34, 0.3);
+}
+
+.kpi-sub-badge.success {
+  background-color: rgba(63, 185, 80, 0.15);
+  color: #56d364;
+  border: 1px solid rgba(63, 185, 80, 0.3);
+}
+
+.kpi-sub-badge.rate {
+  background-color: rgba(88, 166, 255, 0.15);
+  color: var(--accent-primary);
+  border: 1px solid rgba(88, 166, 255, 0.3);
+}
+
+.kpi-hint {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+/* ==========================================================
+   2. TABELA DE RELATÓRIO POR CONTA
+   ========================================================== */
+
+.hunt-table-section {
+  width: 100%;
+}
+
+.table-card {
+  background-color: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.table-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  background-color: var(--surface-card);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.table-header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.table-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.table-subtitle {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.table-badge-accounts {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent-primary);
+  background-color: rgba(88, 166, 255, 0.1);
+  border: 1px solid rgba(88, 166, 255, 0.25);
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+}
+
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.hunt-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.hunt-table thead th {
+  background-color: rgba(15, 17, 23, 0.6);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+  user-select: none;
+}
+
+.hunt-table tbody tr {
+  border-bottom: 1px solid rgba(48, 54, 61, 0.5);
+  transition: background-color var(--transition-fast);
+  cursor: pointer;
+}
+
+.hunt-table tbody tr:last-child {
+  border-bottom: none;
+}
+
+.hunt-table tbody tr:hover {
+  background-color: rgba(88, 166, 255, 0.04);
+}
+
+.hunt-table td {
+  padding: 12px 16px;
+  vertical-align: middle;
+}
+
+/* Coluna: Conta */
+.account-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.account-avatar-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background-color: var(--surface-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--accent-primary);
+}
+
+.account-avatar-icon {
+  width: 18px;
+  height: 18px;
+}
+
+.table-status-indicator {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1.5px solid var(--surface-card);
+}
+
+.table-status-indicator.status-hunting {
+  background-color: var(--status-active);
+  box-shadow: 0 0 6px var(--status-active-glow);
+}
+
+.table-status-indicator.status-idle {
+  background-color: var(--status-idle);
+}
+
+.account-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.account-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.account-submeta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.status-text {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.status-text.status-hunting {
+  color: #56d364;
+}
+
+.status-text.status-idle {
+  color: var(--text-muted);
+}
+
+.meta-partition {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+/* Coluna: Poções Gastas */
+.potions-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.badge-potions-count {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.cost-potions-gold {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: #ff9992;
+}
+
+/* Coluna: Itens Dropados (Chips) */
+.loot-chips-container {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.empty-drops-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.loot-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  font-weight: 500;
+  border: 1px solid var(--border-subtle);
+  background-color: var(--surface-elevated);
+  transition: transform var(--transition-fast);
+}
+
+.loot-chip:hover {
+  transform: scale(1.05);
+}
+
+.loot-chip.rarity-common {
+  color: var(--text-primary);
+  border-color: var(--border-subtle);
+}
+
+.loot-chip.rarity-uncommon {
+  color: #79b8ff;
+  border-color: rgba(88, 166, 255, 0.35);
+  background-color: rgba(88, 166, 255, 0.08);
+}
+
+.loot-chip.rarity-rare {
+  color: #d2a8ff;
+  border-color: rgba(163, 113, 247, 0.35);
+  background-color: rgba(163, 113, 247, 0.08);
+}
+
+.loot-chip.rarity-epic {
+  color: #ffa657;
+  border-color: rgba(240, 136, 62, 0.35);
+  background-color: rgba(240, 136, 62, 0.08);
+}
+
+.loot-name {
+  white-space: nowrap;
+}
+
+.loot-qty {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  opacity: 0.85;
+}
+
+.loot-more-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 5px;
+  border-radius: var(--radius-sm);
+  background-color: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+}
+
+/* Coluna: Capturas Realizadas */
+.catches-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.badge-catches-success {
+  font-size: 13px;
+  font-weight: 700;
+  color: #56d364;
+}
+
+.catches-attempts-label {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+/* Coluna: Lucro Líquido (Gold) */
+.profit-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.profit-main-badge {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+}
+
+.profit-main-badge.profit-positive {
+  background-color: rgba(63, 185, 80, 0.15);
+  border: 1px solid rgba(63, 185, 80, 0.35);
+  color: #56d364;
+}
+
+.profit-main-badge.profit-negative {
+  background-color: rgba(248, 81, 73, 0.15);
+  border: 1px solid rgba(248, 81, 73, 0.35);
+  color: #ff9992;
+}
+
+.profit-sub-label {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+/* Responsividade do Dashboard */
+@media (max-width: 1200px) {
+  .hunt-summary-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .hunt-summary-grid {
+    grid-template-columns: 1fr;
+  }
+}

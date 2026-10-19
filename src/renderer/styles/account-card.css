@@ -1,0 +1,391 @@
+.account-card {
+  display: flex;
+  flex-direction: column;
+  background-color: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  position: relative;
+  /* ISOLAMENTO DE HARDWARE: Impede repaints da janela causados por mutações internas */
+  contain: paint layout;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  transition: border-color var(--transition-fast);
+}
+
+.account-card:focus-within,
+.account-card.is-featured {
+  border-color: var(--accent-primary);
+}
+
+/* ==========================================================
+   CABEÇALHO DO CARD (36px a 38px)
+   ========================================================== */
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: var(--card-header-height);
+  background-color: var(--surface-card);
+  border-bottom: 1px solid var(--border-subtle);
+  padding: 0 10px;
+  user-select: none;
+  z-index: 5;
+  contain: layout style;
+  transform: translateZ(0);
+}
+
+.card-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex-shrink: 0;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--status-active);
+  flex-shrink: 0;
+  transform: translateZ(0);
+  transition: background-color var(--transition-fast);
+}
+
+.status-dot.idle {
+  background-color: var(--status-idle);
+}
+
+.status-dot.error {
+  background-color: var(--status-danger);
+}
+
+.status-dot.clicking {
+  animation: pulse-green 1.2s infinite alternate ease-in-out;
+  will-change: transform, opacity;
+}
+
+@keyframes pulse-green {
+  0% {
+    transform: scale(0.9) translateZ(0);
+    opacity: 0.75;
+  }
+  100% {
+    transform: scale(1.2) translateZ(0);
+    opacity: 1;
+  }
+}
+
+.account-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.card-badge-switch {
+  display: none;
+  font-size: 9px;
+  font-weight: 600;
+  padding: 1px 5px;
+  background-color: rgba(88, 166, 255, 0.12);
+  color: var(--accent-primary);
+  border: 1px solid rgba(88, 166, 255, 0.25);
+  border-radius: 3px;
+  text-transform: uppercase;
+}
+
+/* ==========================================================
+   ESPAÇO CENTRAL: BADGES DE POKÉBOLA E POÇÃO ATIVAS
+   ========================================================== */
+
+.card-header-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  min-width: 0;
+  padding: 0 8px;
+}
+
+.supply-pills-wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+}
+
+.supply-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 22px;
+  padding: 0 7px;
+  background-color: rgba(22, 27, 34, 0.85);
+  border: 1px solid rgba(48, 54, 61, 0.8);
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  contain: paint layout;
+  user-select: none;
+  cursor: default;
+  transition: border-color var(--transition-fast), background-color var(--transition-fast), color var(--transition-fast);
+}
+
+.supply-pill:hover {
+  background-color: rgba(33, 38, 45, 0.95);
+  border-color: rgba(88, 166, 255, 0.4);
+  color: var(--text-primary);
+}
+
+.supply-pill.pill-ball {
+  border-color: rgba(255, 224, 102, 0.3);
+}
+
+.supply-pill.pill-potion {
+  border-color: rgba(74, 222, 128, 0.3);
+}
+
+.supply-icon-box {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.supply-icon-box svg {
+  display: block;
+  width: 14px;
+  height: 14px;
+}
+
+/* Sprites de Itens Reais (Pokébolas e Poções) */
+.item-sprite {
+  width: 16px;
+  height: 16px;
+  max-width: 16px;
+  max-height: 16px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  image-rendering: -webkit-optimize-contrast;
+  display: block;
+  flex-shrink: 0;
+  user-select: none;
+  -webkit-user-drag: none;
+  pointer-events: none;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.4));
+}
+
+.supply-value {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: -0.2px;
+}
+
+.card-header-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+/* Cards fora de destaque na lista lateral (Layout 1x3):
+   Oculta completamente os botões de autoclick, refresh e tela cheia;
+   Mantém apenas as Pokébolas e Poções alinhadas elegantemente à direita */
+.accounts-container[data-layout="layout-1x3"] .account-card:not(.is-featured) .card-header {
+  padding: 0 8px;
+}
+
+.accounts-container[data-layout="layout-1x3"] .account-card:not(.is-featured) .card-header-right {
+  display: none !important;
+}
+
+.accounts-container[data-layout="layout-1x3"] .account-card:not(.is-featured) .card-header-center {
+  justify-content: flex-end;
+  padding: 0;
+  margin-left: auto;
+}
+
+.accounts-container[data-layout="layout-1x3"] .account-card:not(.is-featured) .supply-pills-wrapper {
+  gap: 5px;
+}
+
+.accounts-container[data-layout="layout-1x3"] .account-card:not(.is-featured) .supply-pill {
+  height: 22px;
+  padding: 0 6px;
+  gap: 4px;
+}
+
+.accounts-container[data-layout="layout-1x3"] .account-card:not(.is-featured) .supply-value {
+  font-size: 11px;
+}
+
+/* ==========================================================
+   BOTÃO DE AUTO-CLICK (TOGGLE INDIVIDUAL)
+   ========================================================== */
+
+.btn-autoclick {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background-color: rgba(48, 54, 61, 0.4);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transform: translateZ(0);
+  will-change: background-color, border-color, color;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+}
+
+.btn-autoclick svg {
+  width: 12px;
+  height: 12px;
+  transition: transform var(--transition-fast);
+}
+
+.btn-autoclick:hover {
+  background-color: var(--surface-elevated);
+  color: var(--text-primary);
+  border-color: rgba(88, 166, 255, 0.35);
+}
+
+/* Estado Ativo do Auto-Click */
+.btn-autoclick.active {
+  background-color: rgba(63, 185, 80, 0.15);
+  border-color: rgba(63, 185, 80, 0.5);
+  color: #56d364;
+}
+
+.btn-autoclick.active svg {
+  transform: scale(1.1);
+}
+
+.click-counter {
+  display: none;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  background-color: rgba(63, 185, 80, 0.2);
+  padding: 1px 4px;
+  border-radius: 3px;
+  margin-left: 2px;
+}
+
+.btn-autoclick.active .click-counter {
+  display: inline-block;
+}
+
+/* ==========================================================
+   BOTÕES DE AÇÃO: RELOAD E MAXIMIZAR
+   ========================================================== */
+
+.card-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-secondary);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transform: translateZ(0);
+  will-change: background-color, color;
+  transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+
+.card-action-btn svg {
+  width: 13px;
+  height: 13px;
+}
+
+.card-action-btn:hover {
+  background-color: var(--surface-elevated);
+  color: var(--text-primary);
+  border-color: var(--border-subtle);
+}
+
+.card-action-btn:active svg {
+  transform: scale(0.9);
+}
+
+/* ==========================================================
+   ÁREA DO WEBVIEW (ISOLAMENTO E GPU)
+   ========================================================== */
+
+.webview-container {
+  flex: 1;
+  width: 100%;
+  height: calc(100% - var(--card-header-height));
+  position: relative;
+  background-color: #0d1117;
+  overflow: hidden;
+  /* CRÍTICO: contain: strict isola tamanho, layout e pintura do webview da janela principal */
+  contain: strict;
+  transform: translateZ(0);
+}
+
+.account-webview {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  border: none;
+  background-color: #0d1117;
+  transform: translateZ(0);
+  will-change: transform;
+}
+
+/* Overlay de Loading */
+.webview-loading-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background-color: var(--surface-card);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  z-index: 2;
+  transition: opacity var(--transition-normal);
+  pointer-events: none;
+  contain: strict;
+  transform: translateZ(0);
+}
+
+.webview-loading-overlay.hidden {
+  opacity: 0;
+}
+
+.loading-spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--border-subtle);
+  border-top-color: var(--accent-primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  will-change: transform;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
