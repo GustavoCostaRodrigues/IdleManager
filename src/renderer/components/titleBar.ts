@@ -64,15 +64,15 @@ export class TitleBarComponent {
       const info: SystemInfo = await window.electronAPI?.getSystemInfo();
       if (info?.platform === 'darwin') {
         document.body.classList.add('platform-darwin');
-        this.shortcutBadge.textContent = 'Cmd+C';
+        this.shortcutBadge.textContent = 'Opt+C';
       } else {
         document.body.classList.add('platform-windows');
-        this.shortcutBadge.textContent = 'Ctrl+C';
+        this.shortcutBadge.textContent = 'Alt+C';
       }
     } catch {
       // Fallback para navigator
       const isMac = navigator.platform.toUpperCase().includes('MAC');
-      this.shortcutBadge.textContent = isMac ? 'Cmd+C' : 'Ctrl+C';
+      this.shortcutBadge.textContent = isMac ? 'Opt+C' : 'Alt+C';
     }
   }
 

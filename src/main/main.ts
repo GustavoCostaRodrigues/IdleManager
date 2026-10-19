@@ -30,14 +30,14 @@ function broadcastEmergencyStop(): void {
 }
 
 function registerEmergencyShortcuts(): void {
-  // Atalho de emergência global CommandOrControl+C
+  // Atalho de emergência global Alt+C
   try {
-    const registered = globalShortcut.register('CommandOrControl+C', () => {
+    const registered = globalShortcut.register('Alt+C', () => {
       broadcastEmergencyStop();
     });
 
     if (!registered) {
-      console.warn('Não foi possível registrar o atalho global CommandOrControl+C.');
+      console.warn('Não foi possível registrar o atalho global Alt+C.');
     }
   } catch (err) {
     console.error('Erro ao registrar atalho global:', err);
@@ -46,7 +46,7 @@ function registerEmergencyShortcuts(): void {
 
 function unregisterEmergencyShortcuts(): void {
   try {
-    globalShortcut.unregister('CommandOrControl+C');
+    globalShortcut.unregister('Alt+C');
   } catch (err) {
     console.error('Erro ao desregistrar atalho global:', err);
   }
@@ -57,8 +57,7 @@ function setupWebviewSecurity(): void {
   app.on('web-contents-created', (_event, contents) => {
     // Intercepta atalhos de emergência também nos webcontents filhos (ex: webviews)
     contents.on('before-input-event', (event, input) => {
-      const isCmdOrCtrl = process.platform === 'darwin' ? input.meta : input.control;
-      if (isCmdOrCtrl && input.key.toLowerCase() === 'c' && input.type === 'keyDown') {
+      if (input.alt && input.key.toLowerCase() === 'c' && input.type === 'keyDown') {
         broadcastEmergencyStop();
       }
     });
@@ -117,10 +116,9 @@ function createMainWindow(): void {
     mainWindow?.webContents.send(IPC_CHANNELS.WINDOW_STATE_CHANGE, false);
   });
 
-  // Escuta tecla Cmd+C / Ctrl+C no foco da janela principal
+  // Escuta tecla Alt+C no foco da janela principal
   mainWindow.webContents.on('before-input-event', (event, input) => {
-    const isCmdOrCtrl = process.platform === 'darwin' ? input.meta : input.control;
-    if (isCmdOrCtrl && input.key.toLowerCase() === 'c' && input.type === 'keyDown') {
+    if (input.alt && input.key.toLowerCase() === 'c' && input.type === 'keyDown') {
       broadcastEmergencyStop();
     }
   });

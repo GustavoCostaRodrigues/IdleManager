@@ -52,8 +52,8 @@ Gerenciador desktop profissional e de alta performance para o jogo **Poke Idle W
   - Gerenciamento via `HuntStore` com batching por `requestAnimationFrame`, garantindo 60 FPS contínuos sem travamentos de UI.
   - Botão de reset de sessão e gerador de telemetria para validação imediata.
 
-### 6. Parada de Emergência Global (Ctrl+C / Cmd+C)
-- Escuta globalmente o atalho **Ctrl+C** (Windows/Linux) ou **Cmd+C** (macOS) e possui um botão de destaque na barra de título.
+### 6. Parada de Emergência Global (Alt+C)
+- Escuta globalmente o atalho **Alt+C** (Windows/Linux) ou **Opt+C** (macOS) e possui um botão de destaque na barra de título.
 - Cancela instantaneamente todas as automações de todas as contas em paralelo por segurança, atualizando a interface imediatamente e exibindo um toast de alerta.
 
 ---
