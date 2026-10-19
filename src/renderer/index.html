@@ -80,7 +80,7 @@
             <rect x="9" y="9" width="6" height="6" rx="1" fill="currentColor" />
           </svg>
           <span>PARADA DE EMERGÊNCIA</span>
-          <span class="shortcut-hint" id="emergency-shortcut-badge">Cmd/Ctrl+C</span>
+          <span class="shortcut-hint" id="emergency-shortcut-badge">Alt+C</span>
         </button>
 
         <!-- Controles de Janela Windows/Linux -->
@@ -171,9 +171,9 @@
           </div>
         </div>
 
-        <!-- Rodapé do Drawer: ⚙️ Configurações -->
+        <!-- Rodapé do Drawer: ⚙️ Ajustes & Alertas -->
         <div class="drawer-bottom">
-          <button class="nav-item" id="nav-settings" data-tooltip="Configurações" aria-label="Configurações">
+          <button class="nav-item" id="nav-settings" data-tooltip="Ajustes & Alertas" aria-label="Ajustes">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
               stroke-linejoin="round">
               <path
@@ -202,53 +202,12 @@
         <div class="captures-viewport" id="captures-viewport">
           <!-- Instanciado dinamicamente via CapturesDashboardComponent -->
         </div>
+
+        <!-- 4. Viewport da Tela de Ajustes & Alertas -->
+        <div class="settings-viewport" id="settings-viewport">
+          <!-- Instanciado dinamicamente via SettingsComponent -->
+        </div>
       </main>
-    </div>
-
-    <!-- MODAL DE CONFIGURAÇÕES -->
-    <div class="modal-backdrop" id="modal-settings">
-      <div class="modal-window">
-        <div class="modal-header">
-          <h2 class="modal-title">Configurações do Poke Idle Manager</h2>
-          <button class="card-action-btn" id="btn-close-settings" title="Fechar">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
-        </div>
-        <div class="modal-body">
-          <div class="form-group">
-            <label class="form-label" for="setting-game-url">URL Padrão do Poke Idle World</label>
-            <input type="text" id="setting-game-url" class="form-input" value="https://poke.idleworld.online/">
-            <span class="form-help">Endereço acessado pelas instâncias isoladas do jogo.</span>
-          </div>
-
-          <div class="form-group">
-            <label class="form-label" for="setting-click-interval">Intervalo do Auto-Click (milissegundos)</label>
-            <input type="number" id="setting-click-interval" class="form-input" min="500" max="10000" step="100"
-              value="1500">
-            <span class="form-help">Intervalo entre varreduras de injeção DOM (Padrão: 1500ms).</span>
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">Particionamento de Sessões</label>
-            <div
-              style="font-size: 11px; color: var(--text-secondary); line-height: 1.5; background: var(--bg-base); padding: 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle);">
-              ✔ persist:account_01 (01)<br>
-              ✔ persist:account_02 (02)<br>
-              ✔ persist:account_03 (03)<br>
-              ✔ persist:account_04 (04)<br>
-              <em style="color: var(--text-muted); display: block; margin-top: 4px;">Cada partição mantém cookies, cache
-                e localStorage 100% isolados.</em>
-            </div>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button class="btn-secondary" id="btn-cancel-settings">Cancelar</button>
-          <button class="btn-primary" id="btn-save-settings">Salvar Alterações</button>
-        </div>
-      </div>
     </div>
 
     <!-- CONTAINER DE TOASTS FLUTUANTES -->
