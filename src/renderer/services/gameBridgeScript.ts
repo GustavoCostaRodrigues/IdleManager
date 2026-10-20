@@ -214,7 +214,7 @@ export const GAME_BRIDGE_INJECTION_SCRIPT = `
           if (!doc || !doc.body) continue;
 
           // Se encontrar elementos ativos de caça ou combate, está 100% logado
-          const allButtons = Array.from(doc.querySelectorAll('button, a, div[role="button"], span, div'));
+          const allButtons = Array.from(doc.querySelectorAll('button, a, [role="button"], [class*="btn"], [class*="button"], [class*="catch"], [class*="lancar"]'));
           const hasInGameControls = allButtons.some((b) => {
             const t = (b.textContent || '').trim().toLowerCase();
             return t === 'lançar' || t === 'lancar' || t === '1 selvagem' || t.includes('captura');
@@ -226,7 +226,7 @@ export const GAME_BRIDGE_INJECTION_SCRIPT = `
           if (pwd && (pwd.offsetWidth > 0 || pwd.offsetHeight > 0)) return false;
 
           // Ou botão principal de login/landing ativo na tela
-          const ctaEls = Array.from(doc.querySelectorAll('button, a, div[role="button"], [class*="btn"], [class*="button"]'));
+          const ctaEls = Array.from(doc.querySelectorAll('button, a, [role="button"], [class*="btn"], [class*="button"]'));
           const hasLoginCta = ctaEls.some((el) => {
             if (el.offsetWidth <= 0 && el.offsetHeight <= 0) return false;
             const t = (el.textContent || '').trim().toLowerCase();
@@ -250,7 +250,7 @@ export const GAME_BRIDGE_INJECTION_SCRIPT = `
 
         for (const doc of docs) {
           // Localiza o botão "Lançar"
-          const allButtons = Array.from(doc.querySelectorAll('button, a, div[role="button"], span, div'));
+          const allButtons = Array.from(doc.querySelectorAll('button, a, [role="button"], [class*="btn"], [class*="button"], [class*="catch"], [class*="lancar"]'));
           const launchBtn = allButtons.find((b) => {
             const t = (b.textContent || '').trim().toLowerCase();
             return t === 'lançar' || t === 'lancar' || t === 'catch';
@@ -261,7 +261,7 @@ export const GAME_BRIDGE_INJECTION_SCRIPT = `
             let p = launchBtn.parentElement;
             while (p && p !== doc.body) {
               const pTxt = p.textContent || '';
-              if (pTxt.includes('CAPTURA') || pTxt.includes('Captura') || (p.className && /capture|box|panel/i.test(p.className))) {
+              if (pTxt.includes('CAPTURA') || pTxt.includes('Captura') || (p.className && /capture|box|panel/i.test(String(p.className)))) {
                 captureContainer = p;
                 break;
               }
@@ -273,14 +273,19 @@ export const GAME_BRIDGE_INJECTION_SCRIPT = `
           }
 
           if (!captureContainer) {
-            captureContainer = allButtons.find((el) => {
-              const t = (el.textContent || '').trim();
-              return (
+            const candidateBoxes = doc.querySelectorAll('[class*="capture"], [class*="captur"], [class*="panel"], [class*="box"]');
+            for (let i = 0; i < candidateBoxes.length; i++) {
+              const box = candidateBoxes[i];
+              const t = (box.textContent || '').trim();
+              if (
                 (t.includes('CAPTURA') || t.includes('Captura')) &&
                 (t.includes('selvagem') || t.includes('Loja') || t.includes('Lançar') || t.includes('lancar')) &&
-                el.children.length >= 2
-              );
-            });
+                box.children.length >= 2
+              ) {
+                captureContainer = box;
+                break;
+              }
+            }
           }
 
           if (captureContainer) {
@@ -301,7 +306,7 @@ export const GAME_BRIDGE_INJECTION_SCRIPT = `
 
             // Tentativa 2: Varredura de números isolados no container (ex: 128)
             if (detectedCount === null) {
-              const numNodes = Array.from(captureContainer.querySelectorAll('*')).filter((el) => {
+              const numNodes = Array.from(captureContainer.querySelectorAll('div, span, p, strong, b, [class*="count"]')).filter((el) => {
                 if (el === launchBtn || el.contains(launchBtn)) return false;
                 const text = (el.textContent || '').trim();
                 if (!/^[0-9.,]+$/.test(text)) return false;
@@ -439,9 +444,9 @@ export const GAME_BRIDGE_INJECTION_SCRIPT = `
             }
           }
 
-          // B) Textos com "Small Potion" / "Poção"
+          // B) Textos com "Small Potion" / "Poção" em containers relevantes
           if (!detected) {
-            const potTexts = Array.from(doc.querySelectorAll('div, span, li, p')).filter((el) => {
+            const potTexts = Array.from(doc.querySelectorAll('[class*="inventory"] *, [class*="bag"] *, [class*="mochila"] *, [class*="item"] *, [class*="potion"], [class*="pocao"], [class*="heal"], [title*="Potion"], [title*="Poção"]')).filter((el) => {
               const t = (el.textContent || '').trim();
               return (t.includes('Potion') || t.includes('Poção')) && el.children.length <= 3;
             });
@@ -513,17 +518,28 @@ export const GAME_BRIDGE_INJECTION_SCRIPT = `
     // -------------------------------------------------------------
     function scanHuntAnalyzer() {
       try {
-        const allElements = Array.from(document.querySelectorAll('*'));
-        const analyzerTitle = allElements.find((el) => {
-          const txt = (el.textContent || '').trim();
-          return txt === 'HUNT ANALYZER' || txt.includes('HUNT ANALYZER');
-        });
+        const containers = document.querySelectorAll('div[class*="modal"], div[class*="dialog"], div[class*="analyzer"], div[class*="popup"], [role="dialog"], section');
+        let container = null;
+        for (let i = 0; i < containers.length; i++) {
+          const txt = containers[i].textContent || '';
+          if (txt.includes('HUNT ANALYZER') || (txt.includes('Supply') && txt.includes('DROPS DA SESSÃO'))) {
+            container = containers[i];
+            break;
+          }
+        }
 
-        if (!analyzerTitle) return;
+        if (!container) {
+          const headers = document.querySelectorAll('h1, h2, h3, h4, h5, h6, [class*="title"], [class*="header"]');
+          for (let i = 0; i < headers.length; i++) {
+            if ((headers[i].textContent || '').includes('HUNT ANALYZER')) {
+              container = headers[i].closest('div[class*="modal"], div[class*="dialog"], div[class*="analyzer"], div[class*="popup"]') ||
+                          headers[i].parentElement?.parentElement?.parentElement;
+              break;
+            }
+          }
+        }
 
-        const container = analyzerTitle.closest('div[class*="modal"], div[class*="dialog"], div[class*="analyzer"], div[class*="popup"]') ||
-                          analyzerTitle.parentElement?.parentElement?.parentElement ||
-                          document.body;
+        if (!container) return;
 
         const containerText = container.textContent || '';
         if (!containerText.includes('Supply') && !containerText.includes('DROPS DA SESSÃO')) return;
@@ -569,31 +585,33 @@ export const GAME_BRIDGE_INJECTION_SCRIPT = `
         }
 
         const drops = [];
-        const dropsSectionHeader = Array.from(container.querySelectorAll('*')).find((el) => {
-          return (el.textContent || '').trim().includes('DROPS DA SESSÃO');
-        });
-
-        if (dropsSectionHeader) {
-          const dropsContainer = dropsSectionHeader.parentElement || container;
-          const dropRows = Array.from(dropsContainer.querySelectorAll('div, li, tr')).filter((el) => {
-            const t = el.textContent || '';
-            return t.includes('×') || t.includes('$') || t.includes('x');
+        if (containerText.includes('DROPS DA SESSÃO')) {
+          const dropsSectionHeader = Array.from(container.querySelectorAll('h1, h2, h3, h4, h5, h6, div, span, p, strong, b')).find((el) => {
+            return (el.textContent || '').trim().includes('DROPS DA SESSÃO') && el.children.length <= 2;
           });
 
-          for (const row of dropRows) {
-            const rowText = (row.textContent || '').trim();
-            const itemMatch = rowText.match(/^([A-Za-z0-9À-ÿ\\s\\-_]+?)\\s*[×x](\\d+)\\s*\\$?([0-9\\.,]+)$/);
-            if (itemMatch) {
-              const name = itemMatch[1].trim();
-              const count = parseInt(itemMatch[2], 10) || 1;
-              const valueGold = parseNumeric(itemMatch[3]);
+          if (dropsSectionHeader) {
+            const dropsContainer = dropsSectionHeader.parentElement || container;
+            const dropRows = Array.from(dropsContainer.querySelectorAll('div, li, tr')).filter((el) => {
+              const t = el.textContent || '';
+              return t.includes('×') || t.includes('$') || t.includes('x');
+            });
 
-              if (!drops.some((d) => d.name === name)) {
-                let rarity = 'common';
-                if (name.includes('Strange') || name.includes('Orb')) rarity = 'uncommon';
-                if (name.includes('Stone') && count < 10) rarity = 'rare';
+            for (const row of dropRows) {
+              const rowText = (row.textContent || '').trim();
+              const itemMatch = rowText.match(/^([A-Za-z0-9À-ÿ\\s\\-_]+?)\\s*[×x](\\d+)\\s*\\$?([0-9\\.,]+)$/);
+              if (itemMatch) {
+                const name = itemMatch[1].trim();
+                const count = parseInt(itemMatch[2], 10) || 1;
+                const valueGold = parseNumeric(itemMatch[3]);
 
-                drops.push({ name, count, valueGold, rarity });
+                if (!drops.some((d) => d.name === name)) {
+                  let rarity = 'common';
+                  if (name.includes('Strange') || name.includes('Orb')) rarity = 'uncommon';
+                  if (name.includes('Stone') && count < 10) rarity = 'rare';
+
+                  drops.push({ name, count, valueGold, rarity });
+                }
               }
             }
           }
@@ -627,9 +645,13 @@ export const GAME_BRIDGE_INJECTION_SCRIPT = `
     // -------------------------------------------------------------
     function installMainWorldHooks() {
       try {
+        if (window.__POKE_MAIN_WORLD_WS_INSTALLED__) return;
         const hookId = '__poke_main_world_ws_hook__';
         const doc = document;
-        if (doc.getElementById(hookId)) return;
+        if (doc.getElementById(hookId)) {
+          window.__POKE_MAIN_WORLD_WS_INSTALLED__ = true;
+          return;
+        }
 
         const script = doc.createElement('script');
         script.id = hookId;
@@ -674,7 +696,7 @@ export const GAME_BRIDGE_INJECTION_SCRIPT = `
         ].join('\\n');
         script.textContent = hookCode;
         (doc.head || doc.documentElement || doc.body).appendChild(script);
-        script.remove();
+        window.__POKE_MAIN_WORLD_WS_INSTALLED__ = true;
       } catch (_) {}
     }
 
@@ -833,45 +855,41 @@ export const GAME_BRIDGE_INJECTION_SCRIPT = `
     }
 
     // -------------------------------------------------------------
-    // 5. CICLO DE EXECUÇÃO E OBSERVER CONTÍNUO
+    // 5. CICLO DE EXECUÇÃO LEVE E CONTROLADO (SEM MUTATION OBSERVER INFINITO)
     // -------------------------------------------------------------
+    let isScanning = false;
     function performFullScan() {
-      installMainWorldHooks();
-      hookPotionUsageActions();
-      scanActiveCapturePanel();
-      scanActivePotionSupply();
-      scanHuntAnalyzer();
+      if (isScanning) return;
+      isScanning = true;
+      try {
+        hookPotionUsageActions();
+        scanActiveCapturePanel();
+        scanActivePotionSupply();
+        scanHuntAnalyzer();
 
-      // Sincronização inicial oficial ao detectar login
-      if (!window.__POKE_LOG_INITIAL_SYNCED__ && isGamePageLoggedIn(getBridgeDocs())) {
-        window.__POKE_LOG_INITIAL_SYNCED__ = true;
-        setTimeout(() => {
-          fetchCaptureLogSafely();
-        }, 1500);
+        // Sincronização inicial oficial ao detectar login
+        if (!window.__POKE_LOG_INITIAL_SYNCED__ && isGamePageLoggedIn(getBridgeDocs())) {
+          window.__POKE_LOG_INITIAL_SYNCED__ = true;
+          setTimeout(() => {
+            fetchCaptureLogSafely();
+          }, 1500);
+        }
+      } catch (err) {
+        console.warn('[PokeBridge] Erro no scan:', err);
+      } finally {
+        isScanning = false;
       }
     }
     window.__POKE_BRIDGE_SCAN__ = performFullScan;
 
+    // Instala os hooks do WebSocket na página UMA ÚNICA VEZ
+    installMainWorldHooks();
+
     // Emissão inicial imediata dos dados do painel ativo
     performFullScan();
 
-    // Polling a cada 800ms para manter contadores e capturas sincronizados
-    setInterval(performFullScan, 800);
-
-    // MutationObserver para detectar qualquer alteração de DOM no mesmo instante
-    const observer = new MutationObserver(() => {
-      performFullScan();
-    });
-
-    if (document.body) {
-      observer.observe(document.body, { childList: true, subtree: true, characterData: true });
-    } else {
-      document.addEventListener('DOMContentLoaded', () => {
-        if (document.body) {
-          observer.observe(document.body, { childList: true, subtree: true, characterData: true });
-        }
-      });
-    }
+    // Polling a cada 1200ms para manter contadores e capturas sincronizados sem sobrecarregar a CPU
+    setInterval(performFullScan, 1200);
 
     return { initialized: true, success: true };
   } catch (err) {

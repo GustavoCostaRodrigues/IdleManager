@@ -71,9 +71,7 @@ function setupWebviewSecurity(): void {
   });
 }
 
-// Flags de otimização de aceleração por hardware e GPU do Chromium
-app.commandLine.appendSwitch('enable-gpu-rasterization');
-app.commandLine.appendSwitch('enable-zero-copy');
+// Mantém pipeline nativo e estável do Chromium/Metal no macOS
 app.commandLine.appendSwitch('ignore-gpu-blocklist');
 
 function createMainWindow(): void {
