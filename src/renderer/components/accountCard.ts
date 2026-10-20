@@ -158,7 +158,7 @@ export const ACTIVE_SUPPLY_SCAN_SCRIPT = `
       var docEl = docs[d];
       if (!docEl || !docEl.body) continue;
 
-      var allButtons = Array.from(docEl.querySelectorAll('button, a, div[role="button"], span, div'));
+      var allButtons = Array.from(docEl.querySelectorAll('button, a, [role="button"], [class*="btn"], [class*="button"], [class*="catch"], [class*="lancar"]'));
       var inGameBtn = allButtons.some(function(b) {
         var t = (b.textContent || '').trim().toLowerCase();
         return t === 'lançar' || t === 'lancar' || t === '1 selvagem' || t.indexOf('captura') !== -1;
@@ -180,7 +180,7 @@ export const ACTIVE_SUPPLY_SCAN_SCRIPT = `
           break;
         }
 
-        var buttonsList = Array.from(dEl.querySelectorAll('button, a, div[role="button"], [class*="btn"], [class*="button"]'));
+        var buttonsList = Array.from(dEl.querySelectorAll('button, a, [role="button"], [class*="btn"], [class*="button"]'));
         var hasLoginCta = buttonsList.some(function(b) {
           if (b.offsetWidth <= 0 && b.offsetHeight <= 0) return false;
           var t = (b.textContent || '').trim().toLowerCase();
@@ -203,7 +203,7 @@ export const ACTIVE_SUPPLY_SCAN_SCRIPT = `
       for (var dIdx = 0; dIdx < docs.length; dIdx++) {
         var dScope = docs[dIdx];
         if (!dScope) continue;
-        var buttons = Array.from(dScope.querySelectorAll('button, a, div[role="button"], span, div'));
+        var buttons = Array.from(dScope.querySelectorAll('button, a, [role="button"], [class*="btn"], [class*="button"], [class*="catch"], [class*="lancar"]'));
         launchBtn = buttons.find(function(b) {
           var t = (b.textContent || '').trim().toLowerCase();
           return t === 'lançar' || t === 'lancar' || t === 'catch';
@@ -225,12 +225,17 @@ export const ACTIVE_SUPPLY_SCAN_SCRIPT = `
         }
 
         if (!captureContainer) {
-          captureContainer = buttons.find(function(el) {
-            var t = (el.textContent || '').trim();
-            return (t.indexOf('CAPTURA') !== -1 || t.indexOf('Captura') !== -1) &&
-                   (t.indexOf('selvagem') !== -1 || t.indexOf('Loja') !== -1 || t.indexOf('Lançar') !== -1 || t.indexOf('lancar') !== -1) &&
-                   el.children.length >= 2;
-          });
+          var candidateBoxes = dScope.querySelectorAll('[class*="capture"], [class*="captur"], [class*="panel"], [class*="box"]');
+          for (var bIdx = 0; bIdx < candidateBoxes.length; bIdx++) {
+            var box = candidateBoxes[bIdx];
+            var bTxt = (box.textContent || '').trim();
+            if ((bTxt.indexOf('CAPTURA') !== -1 || bTxt.indexOf('Captura') !== -1) &&
+                (bTxt.indexOf('selvagem') !== -1 || bTxt.indexOf('Loja') !== -1 || bTxt.indexOf('Lançar') !== -1 || bTxt.indexOf('lancar') !== -1) &&
+                box.children.length >= 2) {
+              captureContainer = box;
+              break;
+            }
+          }
         }
 
         if (captureContainer) break;
@@ -276,7 +281,7 @@ export const ACTIVE_SUPPLY_SCAN_SCRIPT = `
     }
 
     if (ballCountVal === null) {
-      var candidates = Array.from(captureContainer.querySelectorAll('*')).filter(function(el) {
+      var candidates = Array.from(captureContainer.querySelectorAll('div, span, p, strong, b, [class*="count"]')).filter(function(el) {
         if (el === launchBtn || el.contains(launchBtn)) return false;
         var text = (el.textContent || '').trim();
         if (!/^[0-9.,]+$/.test(text)) return false;
@@ -468,6 +473,7 @@ export class AccountCardComponent {
   private isMaximized = false;
   private bridgeKeepAliveTimer: number | null = null;
   private supplyPollTimer: number | null = null;
+  private isPollingSupplies = false;
 
   constructor(
     public readonly config: AccountConfig,
@@ -666,13 +672,15 @@ export class AccountCardComponent {
   private startBridgeKeepAlive(): void {
     this.bridgeKeepAliveTimer = window.setInterval(() => {
       this.injectGameBridge();
-    }, 4000);
+    }, 8000);
   }
 
   /**
    * Executa a varredura ativa do DOM via executeJavaScript e atualiza imediatamente os badges de suprimento
    */
   public async pollActiveGameSupplies(): Promise<void> {
+    if (this.isPollingSupplies) return;
+    this.isPollingSupplies = true;
     try {
       if (!this.webview || !this.webview.isConnected || this.webview.isLoading()) return;
       const result = await this.webview.executeJavaScript(ACTIVE_SUPPLY_SCAN_SCRIPT, true).catch(() => null);
@@ -717,6 +725,8 @@ export class AccountCardComponent {
       this.updateSupplyBadges(result.ball, effectivePotion);
     } catch {
       // Ignora erros momentâneos de transição
+    } finally {
+      this.isPollingSupplies = false;
     }
   }
 
@@ -748,7 +758,7 @@ export class AccountCardComponent {
     this.pollActiveGameSupplies();
     this.supplyPollTimer = window.setInterval(() => {
       this.pollActiveGameSupplies();
-    }, 1200);
+    }, 2500);
   }
 
   /**

@@ -2,6 +2,7 @@ import type { CaptureRecord } from '../shared/captureTypes.js';
 import { AccountManager } from './components/accountManager.js';
 import { CapturesDashboardComponent } from './components/capturesDashboard.js';
 import { HuntDashboardComponent } from './components/huntDashboard.js';
+import { IvCalculatorComponent } from './components/ivCalculatorComponent.js';
 import { SettingsComponent } from './components/settingsComponent.js';
 import { TitleBarComponent } from './components/titleBar.js';
 import { ToastManager } from './components/toast.js';
@@ -13,19 +14,22 @@ class PokeIdleApp {
   private titleBar!: TitleBarComponent;
   private huntDashboard!: HuntDashboardComponent;
   private capturesDashboard!: CapturesDashboardComponent;
+  private ivCalculatorComponent!: IvCalculatorComponent;
   private settingsComponent!: SettingsComponent;
   private toastManager = new ToastManager();
 
   private accountsViewport!: HTMLElement;
   private huntViewport!: HTMLElement;
   private capturesViewport!: HTMLElement;
+  private ivCalcViewport!: HTMLElement;
   private settingsViewport!: HTMLElement;
   private navAccountsBtn!: HTMLElement;
   private navLogsBtn!: HTMLElement;
   private navCapturesBtn!: HTMLElement;
+  private navIvCalcBtn!: HTMLElement;
   private navSettingsBtn!: HTMLElement;
 
-  private currentView: 'accounts' | 'hunt' | 'captures' | 'settings' = 'accounts';
+  private currentView: 'accounts' | 'hunt' | 'captures' | 'settings' | 'iv-calc' = 'accounts';
   private lastAlertedCaptureId: string | null = null;
 
   constructor() {
@@ -39,6 +43,7 @@ class PokeIdleApp {
     this.accountsViewport = document.getElementById('accounts-viewport') as HTMLElement;
     this.huntViewport = document.getElementById('hunt-viewport') as HTMLElement;
     this.capturesViewport = document.getElementById('captures-viewport') as HTMLElement;
+    this.ivCalcViewport = document.getElementById('iv-calc-viewport') as HTMLElement;
     this.settingsViewport = document.getElementById('settings-viewport') as HTMLElement;
 
     // Inicializa a barra de título
@@ -71,6 +76,13 @@ class PokeIdleApp {
     );
     this.capturesViewport.appendChild(this.capturesDashboard.element);
 
+    // Inicializa a Calculadora de IV & Simulador de Projeção
+    this.ivCalculatorComponent = new IvCalculatorComponent(
+      (view) => this.switchView(view),
+      (msg, type) => this.toastManager.show(msg, type),
+    );
+    this.ivCalcViewport.appendChild(this.ivCalculatorComponent.element);
+
     // Inicializa a Tela de Ajustes & Alertas de Notificação
     this.settingsComponent = new SettingsComponent(
       (interval) => {
@@ -93,6 +105,7 @@ class PokeIdleApp {
     this.navAccountsBtn = document.getElementById('nav-accounts') as HTMLElement;
     this.navLogsBtn = document.getElementById('nav-logs') as HTMLElement;
     this.navCapturesBtn = document.getElementById('nav-captures') as HTMLElement;
+    this.navIvCalcBtn = document.getElementById('nav-iv-calc') as HTMLElement;
     this.navSettingsBtn = document.getElementById('nav-settings') as HTMLElement;
     const navMarket = document.getElementById('nav-market');
 
@@ -109,6 +122,10 @@ class PokeIdleApp {
       this.switchView('captures');
     });
 
+    this.navIvCalcBtn?.addEventListener('click', () => {
+      this.switchView('iv-calc');
+    });
+
     navMarket?.addEventListener('click', () => {
       this.toastManager.show('Módulo de Mercado & Anúncios em desenvolvimento.', 'info');
     });
@@ -119,19 +136,21 @@ class PokeIdleApp {
     });
   }
 
-  private switchView(view: 'accounts' | 'hunt' | 'captures' | 'settings'): void {
+  private switchView(view: 'accounts' | 'hunt' | 'captures' | 'settings' | 'iv-calc'): void {
     this.currentView = view;
 
     // Atualiza estados dos botões de navegação no drawer lateral
     this.navAccountsBtn?.classList.remove('active');
     this.navLogsBtn?.classList.remove('active');
     this.navCapturesBtn?.classList.remove('active');
+    this.navIvCalcBtn?.classList.remove('active');
     this.navSettingsBtn?.classList.remove('active');
 
     // Oculta todos os viewports
     this.accountsViewport.style.display = 'none';
     this.huntViewport.classList.remove('active');
     this.capturesViewport.classList.remove('active');
+    this.ivCalcViewport.classList.remove('active');
     this.settingsViewport.classList.remove('active');
 
     if (view === 'accounts') {
@@ -144,6 +163,9 @@ class PokeIdleApp {
       this.clearPulsingAlert();
       this.navCapturesBtn?.classList.add('active');
       this.capturesViewport.classList.add('active');
+    } else if (view === 'iv-calc') {
+      this.navIvCalcBtn?.classList.add('active');
+      this.ivCalcViewport.classList.add('active');
     } else if (view === 'settings') {
       this.navSettingsBtn?.classList.add('active');
       this.settingsViewport.classList.add('active');

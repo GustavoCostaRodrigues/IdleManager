@@ -158,6 +158,24 @@
               </svg>
             </button>
 
+            <!-- 🧮 Calculadora de IV & Projeção -->
+            <button class="nav-item" id="nav-iv-calc" data-tooltip="Calculadora de IV & Projeção"
+              aria-label="Calculadora de IV">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                stroke-linejoin="round">
+                <rect x="4" y="2" width="16" height="20" rx="2" />
+                <line x1="8" y1="6" x2="16" y2="6" />
+                <line x1="16" y1="14" x2="16" y2="18" />
+                <path d="M16 10h.01" />
+                <path d="M12 10h.01" />
+                <path d="M8 10h.01" />
+                <path d="M12 14h.01" />
+                <path d="M8 14h.01" />
+                <path d="M12 18h.01" />
+                <path d="M8 18h.01" />
+              </svg>
+            </button>
+
             <!-- 🛒 Mercado / Anúncios (Desativado/Futuro) -->
             <button class="nav-item disabled" id="nav-market" data-tooltip="Mercado e Trocas (Em breve)"
               aria-label="Mercado" disabled>
@@ -203,7 +221,12 @@
           <!-- Instanciado dinamicamente via CapturesDashboardComponent -->
         </div>
 
-        <!-- 4. Viewport da Tela de Ajustes & Alertas -->
+        <!-- 4. Viewport da Calculadora de IV & Projeção -->
+        <div class="iv-calc-viewport" id="iv-calc-viewport">
+          <!-- Instanciado dinamicamente via IvCalculatorComponent -->
+        </div>
+
+        <!-- 5. Viewport da Tela de Ajustes & Alertas -->
         <div class="settings-viewport" id="settings-viewport">
           <!-- Instanciado dinamicamente via SettingsComponent -->
         </div>
