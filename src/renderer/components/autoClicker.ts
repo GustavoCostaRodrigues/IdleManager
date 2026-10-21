@@ -7,6 +7,7 @@ import type {
 import type { PokemonCaptureTelemetry } from '../../shared/telemetryTypes.js';
 import { CaptureStore } from '../services/captureStore.js';
 import { HuntStore } from '../services/huntStore.js';
+import { HuntClientService } from '../services/huntClientService.js';
 
 export interface ExtractedCaptureData {
   pokemonName: string;
@@ -207,6 +208,9 @@ export class AutoClickTask {
     if (this.active) return;
     this.active = true;
     HuntStore.getInstance().setAccountStatus(this.accountId, 'hunting');
+    try {
+      HuntClientService.getInstance().setAccountStatus(this.accountId, 'farming');
+    } catch (_) {}
     this.scheduleNext(100);
   }
 
@@ -214,6 +218,9 @@ export class AutoClickTask {
     this.active = false;
     this.isExecuting = false;
     HuntStore.getInstance().setAccountStatus(this.accountId, 'idle');
+    try {
+      HuntClientService.getInstance().setAccountStatus(this.accountId, 'idle');
+    } catch (_) {}
     if (this.timer !== null) {
       clearTimeout(this.timer);
       this.timer = null;

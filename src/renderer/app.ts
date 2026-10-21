@@ -3,6 +3,8 @@ import { AccountManager } from './components/accountManager.js';
 import { CapturesDashboardComponent } from './components/capturesDashboard.js';
 import { HuntDashboardComponent } from './components/huntDashboard.js';
 import { IvCalculatorComponent } from './components/ivCalculatorComponent.js';
+import { FamilyDepotComponent } from './components/familyDepotComponent.js';
+import { MarketMonitorComponent } from './components/marketMonitorComponent.js';
 import { SettingsComponent } from './components/settingsComponent.js';
 import { TitleBarComponent } from './components/titleBar.js';
 import { ToastManager } from './components/toast.js';
@@ -16,6 +18,8 @@ class PokeIdleApp {
   private capturesDashboard!: CapturesDashboardComponent;
   private ivCalculatorComponent!: IvCalculatorComponent;
   private settingsComponent!: SettingsComponent;
+  private familyDepotComponent!: FamilyDepotComponent;
+  private marketMonitorComponent!: MarketMonitorComponent;
   private toastManager = new ToastManager();
 
   private accountsViewport!: HTMLElement;
@@ -23,13 +27,17 @@ class PokeIdleApp {
   private capturesViewport!: HTMLElement;
   private ivCalcViewport!: HTMLElement;
   private settingsViewport!: HTMLElement;
+  private depotViewport!: HTMLElement;
+  private marketViewport!: HTMLElement;
   private navAccountsBtn!: HTMLElement;
   private navLogsBtn!: HTMLElement;
   private navCapturesBtn!: HTMLElement;
   private navIvCalcBtn!: HTMLElement;
+  private navDepotBtn!: HTMLElement;
+  private navMarketBtn!: HTMLElement;
   private navSettingsBtn!: HTMLElement;
 
-  private currentView: 'accounts' | 'hunt' | 'captures' | 'settings' | 'iv-calc' = 'accounts';
+  private currentView: 'accounts' | 'hunt' | 'captures' | 'settings' | 'iv-calc' | 'depot' | 'market' = 'accounts';
   private lastAlertedCaptureId: string | null = null;
 
   constructor() {
@@ -45,6 +53,8 @@ class PokeIdleApp {
     this.capturesViewport = document.getElementById('captures-viewport') as HTMLElement;
     this.ivCalcViewport = document.getElementById('iv-calc-viewport') as HTMLElement;
     this.settingsViewport = document.getElementById('settings-viewport') as HTMLElement;
+    this.depotViewport = document.getElementById('depot-viewport') as HTMLElement;
+    this.marketViewport = document.getElementById('market-viewport') as HTMLElement;
 
     // Inicializa a barra de título
     this.titleBar = new TitleBarComponent(
@@ -62,10 +72,14 @@ class PokeIdleApp {
 
     this.titleBar.updateLayoutActiveState(this.accountManager.getLayout());
 
-    // Inicializa o Dashboard da Hunt (Painel Financeiro)
+    // Inicializa o Dashboard da Hunt (Grid 2x2 com Jitter)
     this.huntDashboard = new HuntDashboardComponent(
       (accountId) => this.navigateToAccount(accountId),
       (msg, type) => this.toastManager.show(msg, type),
+      () =>
+        this.accountManager
+          .getCards()
+          .map((c) => ({ id: c.config.id, name: c.config.name, webview: c.webview })),
     );
     this.huntViewport.appendChild(this.huntDashboard.element);
 
@@ -96,6 +110,27 @@ class PokeIdleApp {
     );
     this.settingsViewport.appendChild(this.settingsComponent.element);
 
+    // Inicializa o Leitor do Depósito da Família (Exportador Planilha)
+    this.familyDepotComponent = new FamilyDepotComponent(
+      () =>
+        this.accountManager
+          .getCards()
+          .map((c) => ({ id: c.config.id, name: c.config.name, webview: c.webview })),
+      (msg, type) => this.toastManager.show(msg, type),
+    );
+    this.depotViewport.appendChild(this.familyDepotComponent.element);
+
+    // Inicializa o Monitor de Mercado em Tempo Real
+    this.marketMonitorComponent = new MarketMonitorComponent(
+      () =>
+        this.accountManager
+          .getCards()
+          .map((c) => ({ id: c.config.id, name: c.config.name, webview: c.webview })),
+      (msg, type) => this.toastManager.show(msg, type),
+      (accountId) => this.navigateToAccount(accountId),
+    );
+    this.marketViewport.appendChild(this.marketMonitorComponent.element);
+
     this.setupDrawer();
     this.setupEmergencyListeners();
     this.setupCaptureAlertWatcher();
@@ -106,8 +141,9 @@ class PokeIdleApp {
     this.navLogsBtn = document.getElementById('nav-logs') as HTMLElement;
     this.navCapturesBtn = document.getElementById('nav-captures') as HTMLElement;
     this.navIvCalcBtn = document.getElementById('nav-iv-calc') as HTMLElement;
+    this.navDepotBtn = document.getElementById('nav-depot') as HTMLElement;
+    this.navMarketBtn = document.getElementById('nav-market') as HTMLElement;
     this.navSettingsBtn = document.getElementById('nav-settings') as HTMLElement;
-    const navMarket = document.getElementById('nav-market');
 
     this.navAccountsBtn?.addEventListener('click', () => {
       this.switchView('accounts');
@@ -126,8 +162,14 @@ class PokeIdleApp {
       this.switchView('iv-calc');
     });
 
-    navMarket?.addEventListener('click', () => {
-      this.toastManager.show('Módulo de Mercado & Anúncios em desenvolvimento.', 'info');
+    this.navDepotBtn?.addEventListener('click', () => {
+      this.familyDepotComponent.refreshAccountOptions();
+      this.switchView('depot');
+    });
+
+    this.navMarketBtn?.addEventListener('click', () => {
+      this.switchView('market');
+      this.marketMonitorComponent.activate();
     });
 
     // Botão de engrenagem no drawer leva diretamente para a Tela de Ajustes
@@ -136,7 +178,7 @@ class PokeIdleApp {
     });
   }
 
-  private switchView(view: 'accounts' | 'hunt' | 'captures' | 'settings' | 'iv-calc'): void {
+  private switchView(view: 'accounts' | 'hunt' | 'captures' | 'settings' | 'iv-calc' | 'depot' | 'market'): void {
     this.currentView = view;
 
     // Atualiza estados dos botões de navegação no drawer lateral
@@ -144,6 +186,8 @@ class PokeIdleApp {
     this.navLogsBtn?.classList.remove('active');
     this.navCapturesBtn?.classList.remove('active');
     this.navIvCalcBtn?.classList.remove('active');
+    this.navDepotBtn?.classList.remove('active');
+    this.navMarketBtn?.classList.remove('active');
     this.navSettingsBtn?.classList.remove('active');
 
     // Oculta todos os viewports
@@ -152,6 +196,8 @@ class PokeIdleApp {
     this.capturesViewport.classList.remove('active');
     this.ivCalcViewport.classList.remove('active');
     this.settingsViewport.classList.remove('active');
+    this.depotViewport.classList.remove('active');
+    this.marketViewport.classList.remove('active');
 
     if (view === 'accounts') {
       this.navAccountsBtn?.classList.add('active');
@@ -166,6 +212,14 @@ class PokeIdleApp {
     } else if (view === 'iv-calc') {
       this.navIvCalcBtn?.classList.add('active');
       this.ivCalcViewport.classList.add('active');
+    } else if (view === 'depot') {
+      this.navDepotBtn?.classList.add('active');
+      this.depotViewport.classList.add('active');
+      this.familyDepotComponent.refreshAccountOptions();
+    } else if (view === 'market') {
+      this.navMarketBtn?.classList.add('active');
+      this.marketViewport.classList.add('active');
+      this.marketMonitorComponent.activate();
     } else if (view === 'settings') {
       this.navSettingsBtn?.classList.add('active');
       this.settingsViewport.classList.add('active');
