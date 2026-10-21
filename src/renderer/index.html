@@ -176,9 +176,21 @@
               </svg>
             </button>
 
-            <!-- 🛒 Mercado / Anúncios (Desativado/Futuro) -->
-            <button class="nav-item disabled" id="nav-market" data-tooltip="Mercado e Trocas (Em breve)"
-              aria-label="Mercado" disabled>
+            <!-- 👥 Depósito da Família (Exportador Planilha) -->
+            <button class="nav-item" id="nav-depot" data-tooltip="Depósito da Família (Planilha)"
+              aria-label="Depósito da Família">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                stroke-linejoin="round">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                <circle cx="9" cy="7" r="4" />
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+              </svg>
+            </button>
+
+            <!-- 🛒 Mercado / Monitor de Preços em Tempo Real -->
+            <button class="nav-item" id="nav-market" data-tooltip="Monitor de Mercado (Preços & Oportunidades)"
+              aria-label="Mercado">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
                 stroke-linejoin="round">
                 <circle cx="9" cy="21" r="1" />
@@ -229,6 +241,16 @@
         <!-- 5. Viewport da Tela de Ajustes & Alertas -->
         <div class="settings-viewport" id="settings-viewport">
           <!-- Instanciado dinamicamente via SettingsComponent -->
+        </div>
+
+        <!-- 6. Viewport do Depósito da Família (Exportador Planilha) -->
+        <div class="depot-viewport" id="depot-viewport">
+          <!-- Instanciado dinamicamente via FamilyDepotComponent -->
+        </div>
+
+        <!-- 7. Viewport do Monitor de Mercado (Preços & Oportunidades) -->
+        <div class="market-viewport" id="market-viewport">
+          <!-- Instanciado dinamicamente via MarketMonitorComponent -->
         </div>
       </main>
     </div>

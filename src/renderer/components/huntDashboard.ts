@@ -1,34 +1,29 @@
-import type {
-  AccountHuntMetrics,
-  DroppedItem,
-  HuntAggregatedSummary,
-} from '../../shared/huntTypes.js';
-import { HuntStore } from '../services/huntStore.js';
+import { DEFAULT_ACCOUNTS } from '../../shared/constants.js';
+import {
+  HuntClientService,
+  type AccountHuntCardState,
+  type HuntLootItem,
+} from '../services/huntClientService.js';
+import { MarketService } from '../services/marketService.js';
 
 export class HuntDashboardComponent {
   public readonly element: HTMLElement;
-  private readonly store: HuntStore;
+  private readonly service: HuntClientService;
   private unsubscribe?: () => void;
-
-  // Elementos do Topo (KPI Cards)
-  private elTotalPotionsCount!: HTMLElement;
-  private elTotalPotionsCost!: HTMLElement;
-  private elTotalLootGold!: HTMLElement;
-  private elTotalLootItemsCount!: HTMLElement;
-  private elTotalCatchesCount!: HTMLElement;
-  private elTotalCatchesRate!: HTMLElement;
-  private elNetProfitGold!: HTMLElement;
-  private elNetProfitRate!: HTMLElement;
-  private elSessionDuration!: HTMLElement;
-
-  // Elementos da Tabela
-  private tableBody!: HTMLElement;
+  private btnRefreshAll!: HTMLButtonElement;
+  private cardsContainer!: HTMLElement;
+  private isRefreshingAll = false;
 
   constructor(
     private readonly onNavigateToAccount?: (accountId: string) => void,
     private readonly onShowToast?: (message: string, type: 'info' | 'success' | 'danger') => void,
+    private readonly getAccountOptions?: () => Array<{
+      id: string;
+      name: string;
+      webview: Electron.WebviewTag;
+    }>,
   ) {
-    this.store = HuntStore.getInstance();
+    this.service = HuntClientService.getInstance();
     this.element = document.createElement('div');
     this.element.className = 'hunt-dashboard-container';
     this.element.id = 'hunt-dashboard';
@@ -36,299 +31,278 @@ export class HuntDashboardComponent {
     this.renderInitialStructure();
     this.bindDomReferences();
     this.initEvents();
-    this.subscribeToStore();
+    this.tryAutoDetectMissingTokens();
+    this.subscribeToService();
   }
 
   private renderInitialStructure(): void {
     this.element.innerHTML = `
-      <!-- CABEÇALHO DO DASHBOARD DA HUNT -->
+      <!-- CABEÇALHO GLOBAL DO DASHBOARD DE HUNTS -->
       <header class="hunt-header">
         <div class="hunt-header-title-group">
           <div class="hunt-badge-live">
             <span class="live-dot"></span>
-            <span>TELEMETRIA EM TEMPO REAL</span>
+            <span>CLIENT-SIDE COM JITTER SEGURO</span>
           </div>
-          <h1 class="hunt-title">Dashboard da Hunt</h1>
-          <p class="hunt-subtitle">Monitoramento financeiro, balanço de recursos e rendimento das 4 contas conectadas.</p>
+          <h1 class="hunt-title">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="3" width="7" height="7" rx="1"/>
+              <rect x="14" y="3" width="7" height="7" rx="1"/>
+              <rect x="14" y="14" width="7" height="7" rx="1"/>
+              <rect x="3" y="14" width="7" height="7" rx="1"/>
+            </svg>
+            <span>Dashboard de Hunts</span>
+          </h1>
+          <p class="hunt-subtitle">
+            <span>Visão em Grid 2x2 das 4 contas. Consumo direto client-side com desincronização.</span>
+            <span class="hunt-jitter-badge" title="Intervalo randômico entre checagens para proteção anti-bot">
+              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+              </svg>
+              Jitter: 25s – 45s
+            </span>
+          </p>
         </div>
 
         <div class="hunt-header-actions">
-          <button id="btn-reset-hunt-session" class="btn-hunt-action btn-danger-action" title="Zera todas as métricas acumuladas da sessão">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
-              <path d="M3 3v5h5"/>
+          <button id="btn-refresh-all-hunts" class="btn-hunt-refresh-all" title="Dispara uma requisição manual sob demanda para todas as 4 contas instantaneamente">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 2v6h-6"/>
+              <path d="M3 12a9 9 0 0 1 15-6.7L21 8"/>
+              <path d="M3 22v-6h6"/>
+              <path d="M21 12a9 9 0 0 1-15 6.7L3 16"/>
             </svg>
-            <span>Resetar Sessão</span>
+            <span>Atualizar Tudo</span>
           </button>
         </div>
       </header>
 
-      <!-- 1. CARDS DE RESUMO NO TOPO (KPIS CONSOLIDADOS) -->
-      <section class="hunt-summary-grid">
-        <!-- CARD 1: Gasto com Poções -->
-        <div class="kpi-card kpi-potions">
-          <div class="kpi-icon-wrapper potions-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>
-            </svg>
-          </div>
-          <div class="kpi-content">
-            <span class="kpi-label">Poções & Recursos Gastos</span>
-            <div class="kpi-value-row">
-              <span id="kpi-total-potions" class="kpi-main-value">0 un</span>
-              <span id="kpi-total-potions-cost" class="kpi-sub-badge danger">-0 G</span>
-            </div>
-            <span class="kpi-hint">Custo médio: 300 G por poção</span>
-          </div>
-        </div>
-
-        <!-- CARD 2: Valor Estimado de Drops / Loot -->
-        <div class="kpi-card kpi-loot">
-          <div class="kpi-icon-wrapper loot-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="12" cy="12" r="10"/>
-              <circle cx="12" cy="12" r="3"/>
-              <line x1="12" y1="2" x2="12" y2="5"/>
-              <line x1="12" y1="19" x2="12" y2="22"/>
-            </svg>
-          </div>
-          <div class="kpi-content">
-            <span class="kpi-label">Valor de Loot & Drops</span>
-            <div class="kpi-value-row">
-              <span id="kpi-total-loot-gold" class="kpi-main-value gold">+0 G</span>
-              <span id="kpi-total-loot-items" class="kpi-sub-badge gold">0 itens</span>
-            </div>
-            <span class="kpi-hint">Valoração de venda estimada no mercado</span>
-          </div>
-        </div>
-
-        <!-- CARD 3: Total de Pokémons Capturados -->
-        <div class="kpi-card kpi-catches">
-          <div class="kpi-icon-wrapper catches-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z"/>
-              <circle cx="12" cy="12" r="3"/>
-              <path d="M2 12h7m6 0h7"/>
-            </svg>
-          </div>
-          <div class="kpi-content">
-            <span class="kpi-label">Capturas Realizadas</span>
-            <div class="kpi-value-row">
-              <span id="kpi-total-catches" class="kpi-main-value success">0</span>
-              <span id="kpi-catches-rate" class="kpi-sub-badge success">0% taxa</span>
-            </div>
-            <span class="kpi-hint">Somatório de todas as 4 contas</span>
-          </div>
-        </div>
-
-        <!-- CARD 4: Lucro Líquido Estimado (Net Profit) -->
-        <div class="kpi-card kpi-profit">
-          <div class="kpi-icon-wrapper profit-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="12" y1="1" x2="12" y2="23"/>
-              <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
-            </svg>
-          </div>
-          <div class="kpi-content">
-            <div class="kpi-header-with-timer">
-              <span class="kpi-label">Lucro Líquido Geral</span>
-              <span id="kpi-session-duration" class="session-timer-badge">00m 00s</span>
-            </div>
-            <div class="kpi-value-row">
-              <span id="kpi-net-profit-gold" class="kpi-main-value highlight">+0 G</span>
-              <span id="kpi-profit-rate" class="kpi-sub-badge rate">0 G/h</span>
-            </div>
-            <span class="kpi-hint">Saldo líquido: Drops Totais - Recursos Gastos</span>
-          </div>
-        </div>
-      </section>
-
-      <!-- 2. TABELA DE RELATÓRIO POR CONTA -->
-      <section class="hunt-table-section">
-        <div class="table-card">
-          <div class="table-card-header">
-            <div class="table-header-left">
-              <h2 class="table-title">Desempenho Individual por Conta</h2>
-              <span class="table-subtitle">Detalhamento de gastos, inventário dropado e lucro por slot</span>
-            </div>
-            <div class="table-header-right">
-              <span class="table-badge-accounts">4 Contas Monitoradas</span>
-            </div>
-          </div>
-
-          <div class="table-responsive">
-            <table class="hunt-table">
-              <thead>
-                <tr>
-                  <th style="width: 20%;">Conta / Instância</th>
-                  <th style="width: 15%;">Poções Gastas</th>
-                  <th style="width: 33%;">Itens Dropados</th>
-                  <th style="width: 14%;">Capturas</th>
-                  <th style="width: 18%; text-align: right;">Lucro Líquido</th>
-                </tr>
-              </thead>
-              <tbody id="hunt-table-body">
-                <!-- Linhas populadas dinamicamente via TypeScript -->
-              </tbody>
-            </table>
-          </div>
-        </div>
+      <!-- GRID 2x2: OS 4 CARDS DE HUNTS -->
+      <section class="hunt-grid-2x2" id="hunt-cards-grid">
+        <!-- Renderizado dinamicamente via TypeScript -->
       </section>
     `;
   }
 
   private bindDomReferences(): void {
-    this.elTotalPotionsCount = this.element.querySelector('#kpi-total-potions') as HTMLElement;
-    this.elTotalPotionsCost = this.element.querySelector('#kpi-total-potions-cost') as HTMLElement;
-    this.elTotalLootGold = this.element.querySelector('#kpi-total-loot-gold') as HTMLElement;
-    this.elTotalLootItemsCount = this.element.querySelector('#kpi-total-loot-items') as HTMLElement;
-    this.elTotalCatchesCount = this.element.querySelector('#kpi-total-catches') as HTMLElement;
-    this.elTotalCatchesRate = this.element.querySelector('#kpi-catches-rate') as HTMLElement;
-    this.elNetProfitGold = this.element.querySelector('#kpi-net-profit-gold') as HTMLElement;
-    this.elNetProfitRate = this.element.querySelector('#kpi-profit-rate') as HTMLElement;
-    this.elSessionDuration = this.element.querySelector('#kpi-session-duration') as HTMLElement;
-    this.tableBody = this.element.querySelector('#hunt-table-body') as HTMLElement;
+    this.btnRefreshAll = this.element.querySelector('#btn-refresh-all-hunts') as HTMLButtonElement;
+    this.cardsContainer = this.element.querySelector('#hunt-cards-grid') as HTMLElement;
   }
 
   private initEvents(): void {
-    const btnReset = this.element.querySelector('#btn-reset-hunt-session');
-    btnReset?.addEventListener('click', () => {
-      this.store.resetAll();
-      this.onShowToast?.('Sessão da hunt resetada com sucesso.', 'info');
+    this.btnRefreshAll?.addEventListener('click', async () => {
+      if (this.isRefreshingAll) return;
+      this.isRefreshingAll = true;
+      this.btnRefreshAll.classList.add('syncing');
+      this.btnRefreshAll.disabled = true;
+
+      this.onShowToast?.('Disparando requisições manuais para as 4 contas...', 'info');
+
+      try {
+        await this.service.refreshAll();
+      } finally {
+        setTimeout(() => {
+          this.isRefreshingAll = false;
+          this.btnRefreshAll.classList.remove('syncing');
+          this.btnRefreshAll.disabled = false;
+        }, 1200);
+      }
     });
   }
 
-  private subscribeToStore(): void {
-    this.unsubscribe = this.store.subscribe((accounts, summary) => {
-      this.updateTopKpis(summary);
-      this.updateTable(accounts);
+  /**
+   * Tenta detectar automaticamente tokens JWT de webviews caso alguma conta ainda não possua
+   */
+  private async tryAutoDetectMissingTokens(): Promise<void> {
+    if (!this.getAccountOptions) return;
+    try {
+      const options = this.getAccountOptions();
+      const marketService = MarketService.getInstance();
+      for (const opt of options) {
+        if (!marketService.getAccountToken(opt.id) && opt.webview) {
+          await marketService.autoDetectTokenForAccount(opt.id, opt.webview);
+        }
+      }
+    } catch (_) {}
+  }
+
+  private subscribeToService(): void {
+    this.unsubscribe = this.service.subscribe((states) => {
+      this.renderGridCards(states);
     });
   }
 
-  private updateTopKpis(summary: HuntAggregatedSummary): void {
-    // 1. Poções
-    this.elTotalPotionsCount.textContent = `${summary.totalPotionsUsed.toLocaleString('pt-BR')} un`;
-    this.elTotalPotionsCost.textContent = `-${summary.totalPotionsCostGold.toLocaleString('pt-BR')} G`;
+  /**
+   * Renderiza os 4 cards da estrutura 2x2
+   */
+  private renderGridCards(states: Map<string, AccountHuntCardState>): void {
+    this.cardsContainer.innerHTML = '';
 
-    // 2. Loot
-    this.elTotalLootGold.textContent = `+${summary.totalLootValueGold.toLocaleString('pt-BR')} G`;
-    const totalItems = summary.totalCatches + summary.totalPotionsUsed;
-    this.elTotalLootItemsCount.textContent = `${totalItems} registros`;
+    for (const acc of DEFAULT_ACCOUNTS) {
+      const state = states.get(acc.id) || {
+        accountId: acc.id,
+        accountName: acc.name,
+        status: 'idle',
+        loots: [],
+        totalHuntDollar: 0,
+        lastSyncTime: null,
+        syncError: null,
+        isSyncing: false,
+        nextCheckSeconds: 0,
+      };
 
-    // 3. Capturas
-    this.elTotalCatchesCount.textContent = summary.totalCatches.toLocaleString('pt-BR');
-    const rate =
-      summary.totalCatchesAttempted > 0
-        ? Math.round((summary.totalCatches / summary.totalCatchesAttempted) * 100)
-        : 0;
-    this.elTotalCatchesRate.textContent = `${rate}% taxa`;
+      const card = document.createElement('article');
+      card.className = 'hunt-card';
+      card.id = `hunt-card-${acc.id}`;
 
-    // 4. Lucro Líquido
-    const isPositive = summary.totalNetProfitGold >= 0;
-    this.elNetProfitGold.textContent = `${isPositive ? '+' : ''}${summary.totalNetProfitGold.toLocaleString('pt-BR')} G`;
-    this.elNetProfitGold.className = `kpi-main-value ${isPositive ? 'highlight' : 'negative'}`;
+      // Status Badge: 🟢 FARMANDO ou ⚪ OCIOSA
+      const isFarming = state.status === 'farming';
+      const statusBadgeHtml = isFarming
+        ? `<span class="hunt-status-badge status-farming">
+             <span class="status-dot-pulse"></span>
+             <span>🟢 FARMANDO</span>
+           </span>`
+        : `<span class="hunt-status-badge status-idle">
+             <span class="status-dot-idle"></span>
+             <span>⚪ OCIOSA</span>
+           </span>`;
 
-    this.elNetProfitRate.textContent = `${summary.profitPerHourGold.toLocaleString('pt-BR')} G/h`;
-    this.elSessionDuration.textContent = summary.sessionDurationFormatted;
-  }
+      // Aviso discreto de sincronização/erro ou contagem de jitter
+      let syncBadgeHtml = '';
+      if (state.isSyncing) {
+        syncBadgeHtml = `<span class="hunt-sync-spinner" title="Sincronizando inventário e capturas..."></span>`;
+      } else if (state.syncError) {
+        syncBadgeHtml = `<span class="hunt-error-notice" title="${state.syncError}">
+          <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+            <line x1="12" y1="9" x2="12" y2="13"/>
+            <line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+          ${state.syncError}
+        </span>`;
+      } else if (state.nextCheckSeconds > 0) {
+        syncBadgeHtml = `<span class="hunt-jitter-countdown" title="Próxima checagem randômica em ~${state.nextCheckSeconds}s">~${state.nextCheckSeconds}s</span>`;
+      }
 
-  private updateTable(accounts: Map<string, AccountHuntMetrics>): void {
-    this.tableBody.innerHTML = '';
-
-    for (const acc of accounts.values()) {
-      const row = document.createElement('tr');
-      row.className = 'hunt-table-row';
-
-      const isProfitPositive = acc.netProfitGold >= 0;
-      const statusLabel = acc.activeStatus === 'hunting' ? 'Caçando' : 'Ociosa';
-      const statusClass = acc.activeStatus === 'hunting' ? 'status-hunting' : 'status-idle';
-
-      // Itens Dropados formatados como chips horizontais
-      const itemsHtml =
-        acc.droppedItems.length > 0
-          ? acc.droppedItems
-              .slice(-4)
-              .map(
-                (item) => `
-                <span class="loot-chip rarity-${item.rarity}" title="${item.name}: ${item.count} un (${item.totalValueGold.toLocaleString('pt-BR')} G)">
-                  <span class="loot-name">${item.name}</span>
-                  <span class="loot-qty">x${item.count}</span>
-                </span>
-              `,
-              )
+      // Linhas da Lista de Loots (Scrollável)
+      const lootRowsHtml =
+        state.loots.length > 0
+          ? state.loots
+              .map((item) => this.renderLootRowHtml(item))
               .join('')
-          : '<span class="empty-drops-hint">Nenhum drop registrado ainda</span>';
-
-      row.innerHTML = `
-        <!-- Conta / Nome -->
-        <td class="col-account">
-          <div class="account-cell">
-            <div class="account-avatar-wrapper">
-              <svg viewBox="0 0 24 24" class="account-avatar-icon" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="12" cy="12" r="10"/>
-                <path d="M12 2a10 10 0 0 1 10 10"/>
+          : `
+            <div class="hunt-empty-loot-state">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="9"/>
+                <path d="M12 8v4"/>
+                <path d="M12 16h.01"/>
               </svg>
-              <span class="table-status-indicator ${statusClass}"></span>
+              <span class="hunt-empty-title">Nenhum loot registrado nesta hunt</span>
+              <span class="hunt-empty-hint">Novos itens dropados ou Pokémon capturados aparecerão aqui com valor em dólares.</span>
             </div>
-            <div class="account-meta">
-              <strong class="account-title">${acc.accountName}</strong>
-              <div class="account-submeta">
-                <span class="status-text ${statusClass}">${statusLabel}</span>
-                <span class="meta-partition">${acc.accountId}</span>
-              </div>
+          `;
+
+      card.innerHTML = `
+        <!-- 1. CABEÇALHO DO CARD -->
+        <header class="hunt-card-header">
+          <div class="hunt-card-account-group">
+            <div class="hunt-account-avatar">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                <circle cx="12" cy="7" r="4"/>
+              </svg>
             </div>
+            <div class="hunt-card-title-text">
+              <strong class="hunt-card-account-name">${acc.name}</strong>
+              <span class="hunt-card-slot-tag">${acc.id.toUpperCase()}</span>
+            </div>
+            ${statusBadgeHtml}
           </div>
-        </td>
 
-        <!-- Poções Gastas -->
-        <td class="col-potions">
-          <div class="potions-cell">
-            <span class="badge-potions-count">${acc.potionsUsed} un</span>
-            <span class="cost-potions-gold">-${acc.potionsCostGold.toLocaleString('pt-BR')} G</span>
+          <div class="hunt-card-header-right">
+            ${syncBadgeHtml}
           </div>
-        </td>
+        </header>
 
-        <!-- Itens Dropados -->
-        <td class="col-loot">
-          <div class="loot-chips-container">
-            ${itemsHtml}
-            ${
-              acc.droppedItems.length > 4
-                ? `<span class="loot-more-badge">+${acc.droppedItems.length - 4}</span>`
-                : ''
-            }
-          </div>
-        </td>
+        <!-- 2. LISTA DE LOOTS (SCROLLÁVEL) -->
+        <div class="hunt-card-body" id="loot-list-${acc.id}">
+          ${lootRowsHtml}
+        </div>
 
-        <!-- Capturas Realizadas -->
-        <td class="col-catches">
-          <div class="catches-cell">
-            <span class="badge-catches-success">${acc.pokemonCatches}</span>
-            <span class="catches-attempts-label">de ${acc.catchesAttempted} tentativas</span>
+        <!-- 3. RODAPÉ DO CARD -->
+        <footer class="hunt-card-footer">
+          <div class="hunt-total-group">
+            <span class="hunt-total-label">Total da Hunt</span>
+            <span class="hunt-total-value">$ ${state.totalHuntDollar.toLocaleString('pt-BR')}</span>
           </div>
-        </td>
 
-        <!-- Lucro Líquido (Gold) -->
-        <td class="col-profit">
-          <div class="profit-cell">
-            <span class="profit-main-badge ${isProfitPositive ? 'profit-positive' : 'profit-negative'}">
-              ${isProfitPositive ? '+' : ''}${acc.netProfitGold.toLocaleString('pt-BR')} G
-            </span>
-            <span class="profit-sub-label">Bruto: ${acc.totalLootValueGold.toLocaleString('pt-BR')} G</span>
-          </div>
-        </td>
+          <button class="btn-zero-hunt" id="btn-zero-${acc.id}" title="Zera os contadores desta conta e reinicia a contagem de loots da hunt">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+              <path d="M3 3v5h5"/>
+            </svg>
+            <span>Zerar Hunt</span>
+          </button>
+        </footer>
       `;
 
-      // Clicar na conta pode levar ao foco dela
-      row.addEventListener('click', () => {
-        this.onNavigateToAccount?.(acc.accountId);
+      // Evento do botão "Zerar Hunt"
+      const btnZero = card.querySelector(`#btn-zero-${acc.id}`);
+      btnZero?.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        (btnZero as HTMLButtonElement).disabled = true;
+        try {
+          await this.service.resetAccountHunt(acc.id);
+          this.onShowToast?.(`Hunt da ${acc.name} zerada com sucesso!`, 'info');
+        } finally {
+          setTimeout(() => {
+            (btnZero as HTMLButtonElement).disabled = false;
+          }, 600);
+        }
       });
 
-      this.tableBody.appendChild(row);
+      // Clique no cabeçalho permite focar na respectiva conta
+      card.querySelector('.hunt-card-header')?.addEventListener('click', () => {
+        this.onNavigateToAccount?.(acc.id);
+      });
+
+      this.cardsContainer.appendChild(card);
     }
+  }
+
+  /**
+   * Renderiza a linha de loot no formato exato requerido:
+   * [Quantidade]x [Nome do Item/Pokémon] alinhado à esquerda | Valor total em dólar alinhado à direita (emerald-400)
+   */
+  private renderLootRowHtml(item: HuntLootItem): string {
+    const isPokemon = item.kind === 'pokemon';
+    const tagClass = isPokemon ? 'kind-pokemon' : 'kind-item';
+    const tagLabel = isPokemon ? 'POKÉ' : 'ITEM';
+
+    return `
+      <div class="hunt-loot-row" title="${item.name}: ${item.count} un. ($ ${item.unitValueDollar.toLocaleString('pt-BR')} cada)">
+        <div class="hunt-loot-left">
+          <span class="loot-kind-tag ${tagClass}">${tagLabel}</span>
+          <span class="loot-qty-prefix">${item.count}x</span>
+          <span class="loot-name-text">${this.escapeHtml(item.name)}</span>
+        </div>
+        <div class="hunt-loot-right">
+          <span class="loot-dollar-value">$ ${item.totalValueDollar.toLocaleString('pt-BR')}</span>
+        </div>
+      </div>
+    `;
+  }
+
+  private escapeHtml(str: string): string {
+    return str
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
   }
 
   public destroy(): void {
     this.unsubscribe?.();
+    this.service.destroy();
   }
 }

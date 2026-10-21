@@ -1,5 +1,5 @@
 /* ==========================================================
-   DASHBOARD DA HUNT (PAINEL FINANCEIRO)
+   DASHBOARD DE HUNTS (GRID 2x2 - CLIENT-SIDE COM JITTER SEGURO)
    ========================================================== */
 
 .hunt-viewport {
@@ -32,14 +32,14 @@
 .hunt-dashboard-container {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 16px;
   width: 100%;
   max-width: 1400px;
   margin: 0 auto;
 }
 
 /* ==========================================================
-   CABEÇALHO DO DASHBOARD
+   CABEÇALHO GLOBAL DO DASHBOARD DE HUNTS
    ========================================================== */
 
 .hunt-header {
@@ -47,7 +47,11 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding-bottom: 4px;
+  padding: 12px 18px;
+  background: linear-gradient(180deg, rgba(22, 27, 34, 0.9) 0%, rgba(15, 17, 23, 0.95) 100%);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
 }
 
 .hunt-header-title-group {
@@ -63,9 +67,9 @@
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.8px;
-  color: var(--status-active);
-  background-color: rgba(63, 185, 80, 0.12);
-  border: 1px solid rgba(63, 185, 80, 0.3);
+  color: #34D399;
+  background-color: rgba(52, 211, 153, 0.12);
+  border: 1px solid rgba(52, 211, 153, 0.3);
   padding: 2px 8px;
   border-radius: var(--radius-sm);
   width: fit-content;
@@ -75,8 +79,8 @@
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background-color: var(--status-active);
-  box-shadow: 0 0 6px var(--status-active-glow);
+  background-color: #34D399;
+  box-shadow: 0 0 6px rgba(52, 211, 153, 0.7);
   animation: pulse-live 1.5s infinite alternate;
 }
 
@@ -90,11 +94,30 @@
   font-weight: 700;
   color: var(--text-primary);
   letter-spacing: -0.3px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .hunt-subtitle {
   font-size: 12px;
   color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hunt-jitter-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #58A6FF;
+  background: rgba(88, 166, 255, 0.1);
+  border: 1px solid rgba(88, 166, 255, 0.25);
+  padding: 1px 6px;
+  border-radius: 4px;
 }
 
 .hunt-header-actions {
@@ -103,548 +126,417 @@
   gap: 10px;
 }
 
-.btn-hunt-action {
-  display: flex;
+.btn-hunt-refresh-all {
+  display: inline-flex;
   align-items: center;
-  gap: 6px;
-  background-color: var(--surface-card);
-  border: 1px solid var(--border-subtle);
-  color: var(--text-primary);
+  gap: 8px;
+  padding: 8px 16px;
+  background-color: rgba(88, 166, 255, 0.12);
+  border: 1px solid rgba(88, 166, 255, 0.35);
+  border-radius: var(--radius-sm);
+  color: #58A6FF;
   font-size: 12px;
   font-weight: 600;
-  padding: 6px 12px;
-  border-radius: var(--radius-md);
   cursor: pointer;
   transition: all var(--transition-fast);
 }
 
-.btn-hunt-action svg {
-  width: 14px;
-  height: 14px;
-  color: var(--accent-primary);
+.btn-hunt-refresh-all:hover {
+  background-color: rgba(88, 166, 255, 0.22);
+  border-color: #58A6FF;
+  box-shadow: 0 0 12px rgba(88, 166, 255, 0.25);
 }
 
-.btn-hunt-action:hover {
-  background-color: var(--surface-elevated);
-  border-color: var(--accent-primary);
-  box-shadow: 0 0 8px var(--accent-glow);
-  transform: translateY(-1px);
+.btn-hunt-refresh-all svg {
+  width: 15px;
+  height: 15px;
+  transition: transform 0.4s ease;
 }
 
-.btn-hunt-action.btn-danger-action {
-  color: #ff9992;
-  border-color: rgba(248, 81, 73, 0.3);
+.btn-hunt-refresh-all.syncing svg {
+  animation: spin 0.8s linear infinite;
 }
 
-.btn-hunt-action.btn-danger-action svg {
-  color: #f85149;
-}
-
-.btn-hunt-action.btn-danger-action:hover {
-  background-color: rgba(248, 81, 73, 0.15);
-  border-color: #f85149;
-  box-shadow: 0 0 8px var(--status-danger-glow);
+@keyframes spin {
+  100% { transform: rotate(360deg); }
 }
 
 /* ==========================================================
-   CARDS DE RESUMO NO TOPO (KPIS)
+   GRID 2x2 (4 CARDS DE HUNTS)
    ========================================================== */
 
-.hunt-summary-grid {
+.hunt-grid-2x2 {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 14px;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  width: 100%;
 }
 
-.kpi-card {
-  display: flex;
-  align-items: flex-start;
-  gap: 14px;
-  background-color: var(--surface-card);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  padding: 16px;
-  position: relative;
-  overflow: hidden;
-  transition: all var(--transition-fast);
-}
-
-.kpi-card:hover {
-  border-color: rgba(88, 166, 255, 0.4);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
-}
-
-.kpi-icon-wrapper {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 42px;
-  height: 42px;
-  border-radius: var(--radius-md);
-  flex-shrink: 0;
-}
-
-.kpi-icon-wrapper svg {
-  width: 20px;
-  height: 20px;
-}
-
-.potions-icon {
-  background-color: rgba(248, 81, 73, 0.12);
-  color: #ff7b72;
-  border: 1px solid rgba(248, 81, 73, 0.25);
-}
-
-.loot-icon {
-  background-color: rgba(210, 153, 34, 0.12);
-  color: #e3b341;
-  border: 1px solid rgba(210, 153, 34, 0.25);
-}
-
-.catches-icon {
-  background-color: rgba(63, 185, 80, 0.12);
-  color: #56d364;
-  border: 1px solid rgba(63, 185, 80, 0.25);
-}
-
-.profit-icon {
-  background-color: rgba(88, 166, 255, 0.12);
-  color: var(--accent-primary);
-  border: 1px solid rgba(88, 166, 255, 0.25);
-}
-
-.kpi-content {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-  flex: 1;
-}
-
-.kpi-header-with-timer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-}
-
-.kpi-label {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: var(--text-secondary);
-  white-space: nowrap;
-}
-
-.session-timer-badge {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--text-muted);
-  background-color: var(--bg-base);
-  padding: 1px 6px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border-subtle);
-}
-
-.kpi-value-row {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.kpi-main-value {
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--text-primary);
-  letter-spacing: -0.5px;
-}
-
-.kpi-main-value.gold {
-  color: #e3b341;
-}
-
-.kpi-main-value.success {
-  color: #56d364;
-}
-
-.kpi-main-value.highlight {
-  color: #56d364;
-  text-shadow: 0 0 10px rgba(86, 211, 100, 0.3);
-}
-
-.kpi-main-value.negative {
-  color: #ff7b72;
-}
-
-.kpi-sub-badge {
-  font-size: 11px;
-  font-weight: 600;
-  padding: 2px 6px;
-  border-radius: var(--radius-sm);
-  font-family: var(--font-mono);
-}
-
-.kpi-sub-badge.danger {
-  background-color: rgba(248, 81, 73, 0.15);
-  color: #ff9992;
-  border: 1px solid rgba(248, 81, 73, 0.3);
-}
-
-.kpi-sub-badge.gold {
-  background-color: rgba(210, 153, 34, 0.15);
-  color: #e3b341;
-  border: 1px solid rgba(210, 153, 34, 0.3);
-}
-
-.kpi-sub-badge.success {
-  background-color: rgba(63, 185, 80, 0.15);
-  color: #56d364;
-  border: 1px solid rgba(63, 185, 80, 0.3);
-}
-
-.kpi-sub-badge.rate {
-  background-color: rgba(88, 166, 255, 0.15);
-  color: var(--accent-primary);
-  border: 1px solid rgba(88, 166, 255, 0.3);
-}
-
-.kpi-hint {
-  font-size: 10px;
-  color: var(--text-muted);
+@media (max-width: 980px) {
+  .hunt-grid-2x2 {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* ==========================================================
-   2. TABELA DE RELATÓRIO POR CONTA
+   CARD DE HUNT INDIVIDUAL
    ========================================================== */
 
-.hunt-table-section {
-  width: 100%;
-}
-
-.table-card {
-  background-color: var(--surface-card);
+.hunt-card {
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-card);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
   overflow: hidden;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+  min-height: 380px;
+  max-height: 430px;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
-.table-card-header {
+.hunt-card:hover {
+  border-color: rgba(88, 166, 255, 0.4);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45), 0 0 10px rgba(88, 166, 255, 0.08);
+}
+
+/* 1. CABEÇALHO DO CARD */
+.hunt-card-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 18px;
-  background-color: var(--surface-card);
-  border-bottom: 1px solid var(--border-subtle);
-}
-
-.table-header-left {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.table-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.table-subtitle {
-  font-size: 11px;
-  color: var(--text-secondary);
-}
-
-.table-badge-accounts {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--accent-primary);
-  background-color: rgba(88, 166, 255, 0.1);
-  border: 1px solid rgba(88, 166, 255, 0.25);
-  padding: 3px 8px;
-  border-radius: var(--radius-sm);
-}
-
-.table-responsive {
-  width: 100%;
-  overflow-x: auto;
-}
-
-.hunt-table {
-  width: 100%;
-  border-collapse: collapse;
-  text-align: left;
-}
-
-.hunt-table thead th {
-  background-color: rgba(15, 17, 23, 0.6);
-  color: var(--text-secondary);
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.6px;
-  padding: 10px 16px;
-  border-bottom: 1px solid var(--border-subtle);
-  user-select: none;
-}
-
-.hunt-table tbody tr {
-  border-bottom: 1px solid rgba(48, 54, 61, 0.5);
-  transition: background-color var(--transition-fast);
-  cursor: pointer;
-}
-
-.hunt-table tbody tr:last-child {
-  border-bottom: none;
-}
-
-.hunt-table tbody tr:hover {
-  background-color: rgba(88, 166, 255, 0.04);
-}
-
-.hunt-table td {
   padding: 12px 16px;
-  vertical-align: middle;
+  background: rgba(22, 27, 34, 0.85);
+  border-bottom: 1px solid var(--border-subtle);
+  gap: 12px;
 }
 
-/* Coluna: Conta */
-.account-cell {
+.hunt-card-account-group {
   display: flex;
   align-items: center;
   gap: 10px;
 }
 
-.account-avatar-wrapper {
-  position: relative;
+.hunt-account-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: rgba(88, 166, 255, 0.12);
+  border: 1px solid rgba(88, 166, 255, 0.3);
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
-  background-color: var(--surface-elevated);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
-  color: var(--accent-primary);
+  color: #58A6FF;
 }
 
-.account-avatar-icon {
-  width: 18px;
-  height: 18px;
+.hunt-account-avatar svg {
+  width: 16px;
+  height: 16px;
 }
 
-.table-status-indicator {
-  position: absolute;
-  bottom: -2px;
-  right: -2px;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  border: 1.5px solid var(--surface-card);
-}
-
-.table-status-indicator.status-hunting {
-  background-color: var(--status-active);
-  box-shadow: 0 0 6px var(--status-active-glow);
-}
-
-.table-status-indicator.status-idle {
-  background-color: var(--status-idle);
-}
-
-.account-meta {
+.hunt-card-title-text {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
 }
 
-.account-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.account-submeta {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.status-text {
-  font-size: 10px;
-  font-weight: 600;
-  text-transform: uppercase;
-}
-
-.status-text.status-hunting {
-  color: #56d364;
-}
-
-.status-text.status-idle {
-  color: var(--text-muted);
-}
-
-.meta-partition {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--text-muted);
-}
-
-/* Coluna: Poções Gastas */
-.potions-cell {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.badge-potions-count {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.cost-potions-gold {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: #ff9992;
-}
-
-/* Coluna: Itens Dropados (Chips) */
-.loot-chips-container {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-.empty-drops-hint {
-  font-size: 11px;
-  color: var(--text-muted);
-  font-style: italic;
-}
-
-.loot-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 3px 8px;
-  border-radius: var(--radius-sm);
-  font-size: 11px;
-  font-weight: 500;
-  border: 1px solid var(--border-subtle);
-  background-color: var(--surface-elevated);
-  transition: transform var(--transition-fast);
-}
-
-.loot-chip:hover {
-  transform: scale(1.05);
-}
-
-.loot-chip.rarity-common {
-  color: var(--text-primary);
-  border-color: var(--border-subtle);
-}
-
-.loot-chip.rarity-uncommon {
-  color: #79b8ff;
-  border-color: rgba(88, 166, 255, 0.35);
-  background-color: rgba(88, 166, 255, 0.08);
-}
-
-.loot-chip.rarity-rare {
-  color: #d2a8ff;
-  border-color: rgba(163, 113, 247, 0.35);
-  background-color: rgba(163, 113, 247, 0.08);
-}
-
-.loot-chip.rarity-epic {
-  color: #ffa657;
-  border-color: rgba(240, 136, 62, 0.35);
-  background-color: rgba(240, 136, 62, 0.08);
-}
-
-.loot-name {
-  white-space: nowrap;
-}
-
-.loot-qty {
-  font-family: var(--font-mono);
+.hunt-card-account-name {
+  font-size: 14px;
   font-weight: 700;
-  opacity: 0.85;
+  color: #F0F6FC;
+  letter-spacing: -0.2px;
 }
 
-.loot-more-badge {
+.hunt-card-slot-tag {
   font-size: 10px;
-  font-weight: 600;
-  padding: 2px 5px;
-  border-radius: var(--radius-sm);
-  background-color: var(--surface-card);
-  border: 1px solid var(--border-subtle);
+  font-family: var(--font-mono);
   color: var(--text-secondary);
 }
 
-/* Coluna: Capturas Realizadas */
-.catches-cell {
+.hunt-card-header-right {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  align-items: center;
+  gap: 8px;
 }
 
-.badge-catches-success {
-  font-size: 13px;
+/* Status Badges */
+.hunt-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
   font-weight: 700;
-  color: #56d364;
+  padding: 3px 9px;
+  border-radius: 9999px;
+  letter-spacing: 0.3px;
+  user-select: none;
 }
 
-.catches-attempts-label {
+.hunt-status-badge.status-farming {
+  color: #34D399;
+  background: rgba(16, 185, 129, 0.14);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.2);
+}
+
+.hunt-status-badge.status-idle {
+  color: #9CA3AF;
+  background: rgba(107, 114, 128, 0.14);
+  border: 1px solid rgba(107, 114, 128, 0.25);
+}
+
+.status-dot-pulse {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: #34D399;
+  box-shadow: 0 0 6px #34D399;
+  animation: pulse-live 1.2s infinite alternate;
+}
+
+.status-dot-idle {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: #9CA3AF;
+}
+
+.hunt-error-notice {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   font-size: 10px;
-  color: var(--text-muted);
+  font-weight: 600;
+  color: #F87171;
+  background: rgba(248, 113, 113, 0.12);
+  border: 1px solid rgba(248, 113, 113, 0.3);
+  padding: 2px 7px;
+  border-radius: 4px;
+  max-width: 140px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-/* Coluna: Lucro Líquido (Gold) */
-.profit-cell {
+.hunt-sync-spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(88, 166, 255, 0.2);
+  border-top-color: #58A6FF;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  display: inline-block;
+}
+
+.hunt-jitter-countdown {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+/* 2. LISTA DE LOOTS (SCROLLÁVEL) */
+.hunt-card-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px 14px;
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
-  gap: 2px;
+  gap: 6px;
+  background-color: rgba(15, 17, 23, 0.4);
 }
 
-.profit-main-badge {
+.hunt-card-body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.hunt-card-body::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.hunt-card-body::-webkit-scrollbar-thumb {
+  background: rgba(48, 54, 61, 0.8);
+  border-radius: 3px;
+}
+
+.hunt-card-body::-webkit-scrollbar-thumb:hover {
+  background: rgba(88, 166, 255, 0.5);
+}
+
+.hunt-loot-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: rgba(22, 27, 34, 0.7);
+  border: 1px solid rgba(48, 54, 61, 0.5);
+  border-radius: var(--radius-sm);
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.hunt-loot-row:hover {
+  background: rgba(30, 36, 46, 0.9);
+  border-color: rgba(88, 166, 255, 0.3);
+}
+
+.hunt-loot-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #C9D1D9;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.loot-kind-tag {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  text-transform: uppercase;
+}
+
+.loot-kind-tag.kind-pokemon {
+  color: #FACC15;
+  background: rgba(250, 204, 21, 0.12);
+  border: 1px solid rgba(250, 204, 21, 0.3);
+}
+
+.loot-kind-tag.kind-item {
+  color: #38BDF8;
+  background: rgba(56, 189, 248, 0.12);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+}
+
+.loot-qty-prefix {
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: #F0F6FC;
+}
+
+.loot-name-text {
+  font-weight: 500;
+  color: #E6EDF3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hunt-loot-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.loot-dollar-value {
   font-family: var(--font-mono);
   font-size: 13px;
   font-weight: 700;
-  padding: 3px 8px;
-  border-radius: var(--radius-sm);
+  color: #34D399; /* emerald-400 */
+  text-shadow: 0 0 8px rgba(52, 211, 153, 0.25);
 }
 
-.profit-main-badge.profit-positive {
-  background-color: rgba(63, 185, 80, 0.15);
-  border: 1px solid rgba(63, 185, 80, 0.35);
-  color: #56d364;
-}
-
-.profit-main-badge.profit-negative {
-  background-color: rgba(248, 81, 73, 0.15);
-  border: 1px solid rgba(248, 81, 73, 0.35);
-  color: #ff9992;
-}
-
-.profit-sub-label {
-  font-size: 10px;
+/* Empty State na lista de loots */
+.hunt-empty-loot-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: 160px;
+  gap: 8px;
   color: var(--text-muted);
+  text-align: center;
+  padding: 24px 16px;
 }
 
-/* Responsividade do Dashboard */
-@media (max-width: 1200px) {
-  .hunt-summary-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
+.hunt-empty-loot-state svg {
+  width: 32px;
+  height: 32px;
+  color: var(--border-subtle);
 }
 
-@media (max-width: 768px) {
-  .hunt-summary-grid {
-    grid-template-columns: 1fr;
-  }
+.hunt-empty-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.hunt-empty-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  max-width: 240px;
+}
+
+/* 3. RODAPÉ DO CARD */
+.hunt-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: rgba(22, 27, 34, 0.95);
+  border-top: 1px solid var(--border-subtle);
+  gap: 12px;
+}
+
+.hunt-total-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.hunt-total-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+}
+
+.hunt-total-value {
+  font-size: 18px;
+  font-weight: 800;
+  font-family: var(--font-mono);
+  color: #34D399; /* emerald-400 */
+  letter-spacing: -0.3px;
+  text-shadow: 0 0 12px rgba(52, 211, 153, 0.35);
+}
+
+.btn-zero-hunt {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  background: rgba(248, 81, 73, 0.1);
+  border: 1px solid rgba(248, 81, 73, 0.35);
+  border-radius: var(--radius-sm);
+  color: #F85149;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-zero-hunt:hover {
+  background: rgba(248, 81, 73, 0.22);
+  border-color: #F85149;
+  box-shadow: 0 0 10px rgba(248, 81, 73, 0.25);
+  transform: translateY(-1px);
+}
+
+.btn-zero-hunt:active {
+  transform: translateY(0);
+}
+
+.btn-zero-hunt svg {
+  width: 14px;
+  height: 14px;
 }
