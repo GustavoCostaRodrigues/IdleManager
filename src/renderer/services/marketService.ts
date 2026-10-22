@@ -95,6 +95,7 @@ export interface MyMarketData {
 
 const STORAGE_KEY_TOKEN = 'poke_idle_market_jwt_token';
 const STORAGE_KEY_ACCOUNT_TOKENS = 'poke_idle_market_account_tokens_v1';
+const STORAGE_KEY_ACCOUNT_JWT_ACTIVE = 'poke_idle_account_jwt_active_v1';
 const STORAGE_KEY_ACTIVE_ACCOUNT = 'poke_idle_market_active_account_id';
 const STORAGE_KEY_REQUESTS_ENABLED = 'poke_idle_market_requests_enabled';
 const STORAGE_KEY_HISTORY = 'poke_idle_market_history_v1';
@@ -104,11 +105,14 @@ export class MarketService {
   private static instance: MarketService | null = null;
   private cachedToken: string | null = null;
   private accountTokens: Record<string, string> = {};
+  private accountJwtActive: Record<string, boolean> = {};
   private activeAccountId = 'account_01';
   private requestsEnabled = true;
   private myMarketCache: Record<string, MyMarketData> = {};
   private priceHistory: Record<string, MarketPricePoint[]> = {};
   private targetPrices: Record<string, number> = {};
+  private tokenListeners = new Set<(accountId: string, token: string | null) => void>();
+  private requestsListeners = new Set<(enabled: boolean) => void>();
 
   private constructor() {
     this.loadTokensAndActiveAccount();
@@ -136,6 +140,24 @@ export class MarketService {
     try {
       localStorage.setItem(STORAGE_KEY_REQUESTS_ENABLED, String(this.requestsEnabled));
     } catch (_) {}
+    this.notifyRequestsChange(this.requestsEnabled);
+  }
+
+  public onRequestsEnabledChange(listener: (enabled: boolean) => void): () => void {
+    this.requestsListeners.add(listener);
+    return () => {
+      this.requestsListeners.delete(listener);
+    };
+  }
+
+  private notifyRequestsChange(enabled: boolean): void {
+    for (const listener of this.requestsListeners) {
+      try {
+        listener(enabled);
+      } catch (err) {
+        console.error('[MarketService] Erro no listener de requisições:', err);
+      }
+    }
   }
 
   // ==========================================
@@ -162,6 +184,44 @@ export class MarketService {
     }
   }
 
+  public onTokenChange(listener: (accountId: string, token: string | null) => void): () => void {
+    this.tokenListeners.add(listener);
+    return () => {
+      this.tokenListeners.delete(listener);
+    };
+  }
+
+  private notifyTokenChange(accountId: string, token: string | null): void {
+    for (const listener of this.tokenListeners) {
+      try {
+        listener(accountId, token);
+      } catch (err) {
+        console.error('[MarketService] Erro no listener de token:', err);
+      }
+    }
+  }
+
+  public isAccountJwtActive(accountId: string): boolean {
+    const cleanId = (accountId || 'account_01').trim();
+    if (this.accountJwtActive[cleanId] !== undefined) {
+      return this.accountJwtActive[cleanId];
+    }
+    // Por padrão, se possui um token configurado, inicia ativo
+    return !!this.accountTokens[cleanId];
+  }
+
+  public setAccountJwtActive(accountId: string, active: boolean): void {
+    const cleanId = (accountId || 'account_01').trim();
+    this.accountJwtActive[cleanId] = !!active;
+    this.saveAccountJwtActive();
+    this.notifyTokenChange(cleanId, this.getActiveAccountToken(cleanId));
+  }
+
+  public getActiveAccountToken(accountId: string): string | null {
+    if (!this.isAccountJwtActive(accountId)) return null;
+    return this.getAccountToken(accountId);
+  }
+
   public getAccountToken(accountId: string): string | null {
     return this.accountTokens[accountId] || null;
   }
@@ -169,9 +229,15 @@ export class MarketService {
   public setAccountToken(accountId: string, token: string): void {
     const cleanToken = (token || '').trim();
     const cleanId = (accountId || 'account_01').trim();
+    const prevToken = this.accountTokens[cleanId] || null;
 
     if (cleanToken) {
       this.accountTokens[cleanId] = cleanToken;
+      // Ao salvar ou alterar um token novo, ativa automaticamente se não estiver definido
+      if (this.accountJwtActive[cleanId] === undefined) {
+        this.accountJwtActive[cleanId] = true;
+        this.saveAccountJwtActive();
+      }
     } else {
       delete this.accountTokens[cleanId];
     }
@@ -185,6 +251,27 @@ export class MarketService {
         localStorage.removeItem(STORAGE_KEY_TOKEN);
       }
     }
+
+    const currentToken = cleanToken || null;
+    if (prevToken !== currentToken) {
+      this.notifyTokenChange(cleanId, currentToken);
+    }
+  }
+
+  public removeAccountToken(accountId: string): void {
+    const cleanId = (accountId || 'account_01').trim();
+    delete this.accountTokens[cleanId];
+    this.accountJwtActive[cleanId] = false;
+    this.saveAccountTokens();
+    this.saveAccountJwtActive();
+
+    if (cleanId === this.activeAccountId) {
+      this.cachedToken = null;
+      try {
+        localStorage.removeItem(STORAGE_KEY_TOKEN);
+      } catch (_) {}
+    }
+    this.notifyTokenChange(cleanId, null);
   }
 
   public getAllAccountTokens(): Record<string, string> {
@@ -205,11 +292,24 @@ export class MarketService {
     } catch (_) {}
   }
 
+  private saveAccountJwtActive(): void {
+    try {
+      localStorage.setItem(STORAGE_KEY_ACCOUNT_JWT_ACTIVE, JSON.stringify(this.accountJwtActive));
+    } catch (_) {}
+  }
+
   private loadTokensAndActiveAccount(): void {
     try {
       const rawTokens = localStorage.getItem(STORAGE_KEY_ACCOUNT_TOKENS);
       if (rawTokens) {
         this.accountTokens = JSON.parse(rawTokens);
+      }
+    } catch (_) {}
+
+    try {
+      const rawActive = localStorage.getItem(STORAGE_KEY_ACCOUNT_JWT_ACTIVE);
+      if (rawActive) {
+        this.accountJwtActive = JSON.parse(rawActive);
       }
     } catch (_) {}
 
@@ -361,12 +461,18 @@ export class MarketService {
   }> {
     if (!this.requestsEnabled) {
       throw new Error(
-        'Requisições à API de mercado desativadas pelo switch. Ative o switch para buscar dados.',
+        'Requisições à API de mercado desativadas na tela de Ajustes. Ative o switch para buscar dados.',
+      );
+    }
+
+    if (!this.isAccountJwtActive(this.activeAccountId)) {
+      throw new Error(
+        `Token JWT da conta ativa (${this.activeAccountId}) está desativado na tela de Ajustes.`,
       );
     }
 
     const itemConfig = MONITORED_ITEMS[itemType];
-    const token = this.getToken();
+    const token = this.getActiveAccountToken(this.activeAccountId);
 
     if (!token) {
       throw new Error(
@@ -462,16 +568,20 @@ export class MarketService {
   }> {
     if (!this.requestsEnabled) {
       throw new Error(
-        'Requisições à API de mercado desativadas pelo switch. Ative o switch para buscar dados.',
+        'Requisições à API de mercado desativadas na tela de Ajustes. Ative o switch para buscar dados.',
       );
     }
 
     const targetAccountId = accountId || this.activeAccountId;
-    const token = tokenOverride || this.getAccountToken(targetAccountId) || this.getToken();
+    if (!this.isAccountJwtActive(targetAccountId)) {
+      throw new Error(`Token JWT da conta ${targetAccountId} está desativado na tela de Ajustes.`);
+    }
+
+    const token = tokenOverride || this.getActiveAccountToken(targetAccountId);
 
     if (!token) {
       throw new Error(
-        `Token JWT não configurado para a conta ${targetAccountId}. Faça login no slot correspondente ou insira o token.`,
+        `Token JWT não configurado para a conta ${targetAccountId}. Faça login no slot correspondente ou insira o token em Ajustes.`,
       );
     }
 

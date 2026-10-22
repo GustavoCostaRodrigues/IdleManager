@@ -18,9 +18,12 @@ export interface PokemonCaptureTelemetry {
 export interface BatchCapturesTelemetry {
   type: 'BATCH_CAPTURES';
   captures: Array<{
+    id?: string;
     pokemonName: string;
+    pokemonDexNumber?: number;
     level?: number;
     quality?: PokemonQuality;
+    qualityMultiplier?: number;
     pokeball?: PokeballType;
     ivPoints?: number;
     ivMaxPoints?: number;
@@ -28,6 +31,12 @@ export interface BatchCapturesTelemetry {
     isShiny?: boolean;
     timestamp?: number;
   }>;
+  timestamp?: number;
+}
+
+export interface TokenDetectedTelemetry {
+  type: 'TOKEN_DETECTED';
+  token: string;
   timestamp?: number;
 }
 
@@ -119,6 +128,7 @@ export interface SupplyStatusTelemetry {
 export type TelemetryPayload =
   | PokemonCaptureTelemetry
   | BatchCapturesTelemetry
+  | TokenDetectedTelemetry
   | PotionUsedTelemetry
   | ItemDropTelemetry
   | HuntSessionSyncTelemetry

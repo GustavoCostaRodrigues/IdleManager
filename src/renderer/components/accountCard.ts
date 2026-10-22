@@ -10,6 +10,7 @@ import { getItemSpriteHtml, getItemSpriteUrl } from './supplyIcons.js';
 import { GAME_BRIDGE_INJECTION_SCRIPT } from '../services/gameBridgeScript.js';
 import { CaptureStore } from '../services/captureStore.js';
 import { HuntStore } from '../services/huntStore.js';
+import { MarketService } from '../services/marketService.js';
 
 /**
  * Script de Injeção e Varredura Ativa do DOM executado no WebView via executeJavaScript.
@@ -474,6 +475,7 @@ export class AccountCardComponent {
   private bridgeKeepAliveTimer: number | null = null;
   private supplyPollTimer: number | null = null;
   private isPollingSupplies = false;
+  private lastTokenAutoDetectTime = 0;
 
   constructor(
     public readonly config: AccountConfig,
@@ -612,6 +614,7 @@ export class AccountCardComponent {
       this.loadingOverlay.classList.add('hidden');
       this.injectGameBridge();
       this.pollActiveGameSupplies();
+      this.tryAutoDetectToken();
       if (this.autoClickTask.isActive()) {
         this.setStatus('clicking', 'Auto-click ativo');
       } else {
@@ -723,10 +726,43 @@ export class AccountCardComponent {
       const effectivePotion = this.lastKnownPotionData || result.potion;
 
       this.updateSupplyBadges(result.ball, effectivePotion);
+      this.tryAutoDetectToken();
     } catch {
       // Ignora erros momentâneos de transição
     } finally {
       this.isPollingSupplies = false;
+    }
+  }
+
+  /**
+   * Tenta extrair e registrar o token JWT da conta a partir do webview após login
+   */
+  public async tryAutoDetectToken(force = false): Promise<string | null> {
+    const now = Date.now();
+    const marketService = MarketService.getInstance();
+    const existingToken = marketService.getAccountToken(this.config.id);
+
+    // Se já tem token e não for forçado, checa apenas esporadicamente (1x a cada 60s)
+    if (!force && existingToken && now - this.lastTokenAutoDetectTime < 60000) {
+      return existingToken;
+    }
+
+    // Se ainda não tem token, limita as tentativas a cada 3.5 segundos
+    if (!force && !existingToken && now - this.lastTokenAutoDetectTime < 3500) {
+      return null;
+    }
+
+    this.lastTokenAutoDetectTime = now;
+
+    try {
+      if (!this.webview || !this.webview.isConnected || this.webview.isLoading()) return null;
+      const detected = await marketService.autoDetectTokenForAccount(this.config.id, this.webview);
+      if (detected) {
+        console.log(`[AccountCard:${this.config.id}] JWT Token sincronizado automaticamente com sucesso.`);
+      }
+      return detected;
+    } catch {
+      return null;
     }
   }
 
@@ -887,6 +923,13 @@ export class AccountCardComponent {
 
         // 2. Registra na Hunt da Conta e métricas globais
         HuntStore.getInstance().recordPokemonCatch(this.config.id, true, pokemonName);
+        break;
+      }
+
+      case 'TOKEN_DETECTED': {
+        if (payload.token && typeof payload.token === 'string' && payload.token.startsWith('ey')) {
+          MarketService.getInstance().setAccountToken(this.config.id, payload.token);
+        }
         break;
       }
 

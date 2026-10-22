@@ -585,3 +585,496 @@
   color: var(--accent-primary);
   flex-shrink: 0;
 }
+
+/* ==========================================================
+   CARDS DE CONTROLE DE REQUISIÇÕES POR TELA
+   ========================================================== */
+
+.settings-card-icon.network-icon {
+  color: #38bdf8;
+  border-color: rgba(56, 189, 248, 0.35);
+  background: rgba(56, 189, 248, 0.08);
+}
+
+.settings-card-icon.jwt-icon {
+  color: #a78bfa;
+  border-color: rgba(167, 139, 250, 0.35);
+  background: rgba(167, 139, 250, 0.08);
+}
+
+.btn-settings-action.btn-detect-all {
+  background: rgba(167, 139, 250, 0.12);
+  border: 1px solid rgba(167, 139, 250, 0.35);
+  color: #c4b5fd;
+}
+
+.btn-settings-action.btn-detect-all:hover {
+  background: rgba(167, 139, 250, 0.22);
+  border-color: #a78bfa;
+  box-shadow: 0 0 12px rgba(167, 139, 250, 0.3);
+}
+
+.settings-screens-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+}
+
+.settings-screen-card {
+  background: rgba(15, 23, 42, 0.45);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 12px;
+  transition: all var(--transition-fast);
+}
+
+.settings-screen-card:hover {
+  border-color: rgba(88, 166, 255, 0.35);
+  background: rgba(15, 23, 42, 0.6);
+}
+
+.settings-screen-card.screen-card-safe {
+  border-color: rgba(59, 130, 246, 0.3);
+  background: rgba(30, 58, 138, 0.12);
+}
+
+.screen-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.screen-card-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.screen-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.screen-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.hunt-screen-icon {
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  color: #fbbf24;
+}
+
+.market-screen-icon {
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #34d399;
+}
+
+.capture-screen-icon {
+  background: rgba(59, 130, 246, 0.15);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  color: #60a5fa;
+}
+
+.screen-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 2px;
+}
+
+.screen-route {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.screen-route code {
+  color: var(--accent-primary);
+  font-family: monospace;
+}
+
+.screen-badge-locked {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(59, 130, 246, 0.18);
+  border: 1px solid rgba(59, 130, 246, 0.4);
+  color: #93c5fd;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.screen-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.45;
+  margin: 0;
+}
+
+.screen-status-row {
+  display: flex;
+  align-items: center;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.screen-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+}
+
+.screen-status-badge.status-active {
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #34d399;
+}
+
+.screen-status-badge.status-paused {
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #f87171;
+}
+
+.screen-status-badge.status-safe {
+  background: rgba(59, 130, 246, 0.12);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  color: #93c5fd;
+}
+
+/* ==========================================================
+   GRID DE GERENCIAMENTO DE CONTAS & TOKENS JWT
+   ========================================================== */
+
+.settings-accounts-jwt-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 16px;
+}
+
+.account-jwt-card {
+  background: rgba(15, 23, 42, 0.55);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  transition: all var(--transition-fast);
+  position: relative;
+}
+
+.account-jwt-card:hover {
+  border-color: rgba(167, 139, 250, 0.35);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+}
+
+.account-jwt-card.jwt-disabled {
+  border-left: 3px solid #f59e0b;
+}
+
+.account-jwt-card.reqs-disabled {
+  opacity: 0.92;
+}
+
+.account-jwt-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.account-jwt-title-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.account-jwt-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(88, 166, 255, 0.2), rgba(167, 139, 250, 0.25));
+  border: 1px solid rgba(167, 139, 250, 0.35);
+  color: #c4b5fd;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.account-jwt-name-col {
+  display: flex;
+  flex-direction: column;
+}
+
+.account-jwt-name {
+  font-size: 14px;
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.account-jwt-sub {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: monospace;
+}
+
+.account-jwt-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+}
+
+.account-jwt-badge.badge-active {
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  color: #34d399;
+}
+
+.account-jwt-badge.badge-disabled {
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  color: #fbbf24;
+}
+
+.account-jwt-badge.badge-missing {
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  color: #f87171;
+}
+
+.badge-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.badge-dot.green {
+  background-color: #10b981;
+  box-shadow: 0 0 6px #10b981;
+}
+
+.badge-dot.yellow {
+  background-color: #f59e0b;
+  box-shadow: 0 0 6px #f59e0b;
+}
+
+.badge-dot.red {
+  background-color: #ef4444;
+  box-shadow: 0 0 6px #ef4444;
+}
+
+.badge-dot.blue {
+  background-color: #3b82f6;
+  box-shadow: 0 0 6px #3b82f6;
+}
+
+/* Switches da Conta */
+.account-jwt-switches {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.account-jwt-switch-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.switch-label-col {
+  display: flex;
+  flex-direction: column;
+}
+
+.switch-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.switch-hint {
+  font-size: 9px;
+  color: var(--text-muted);
+}
+
+/* Seção de Input do Token */
+.account-jwt-input-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.jwt-input-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.jwt-input-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.jwt-length-indicator {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-family: monospace;
+}
+
+.jwt-length-indicator.has-token {
+  color: #38bdf8;
+  font-weight: 600;
+}
+
+.jwt-input-wrapper {
+  display: flex;
+  align-items: center;
+  position: relative;
+}
+
+.account-jwt-input {
+  width: 100%;
+  background: var(--bg-base);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 8px 36px 8px 10px;
+  font-size: 11px;
+  color: var(--text-primary);
+  font-family: monospace;
+  outline: none;
+  transition: all var(--transition-fast);
+}
+
+.account-jwt-input:focus {
+  border-color: #a78bfa;
+  box-shadow: 0 0 0 2px rgba(167, 139, 250, 0.2);
+}
+
+.btn-toggle-jwt-vis {
+  position: absolute;
+  right: 8px;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border-radius: var(--radius-sm);
+  transition: color var(--transition-fast);
+}
+
+.btn-toggle-jwt-vis:hover {
+  color: var(--text-primary);
+}
+
+/* Botões de Ação do Card da Conta */
+.account-jwt-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-jwt-action {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  user-select: none;
+  white-space: nowrap;
+}
+
+.btn-jwt-action svg {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+}
+
+.btn-jwt-save {
+  background: rgba(88, 166, 255, 0.15);
+  border: 1px solid rgba(88, 166, 255, 0.35);
+  color: #79c0ff;
+}
+
+.btn-jwt-save:hover {
+  background: rgba(88, 166, 255, 0.25);
+  border-color: #79c0ff;
+  box-shadow: 0 0 8px rgba(88, 166, 255, 0.3);
+}
+
+.btn-jwt-detect {
+  background: rgba(167, 139, 250, 0.15);
+  border: 1px solid rgba(167, 139, 250, 0.35);
+  color: #c4b5fd;
+}
+
+.btn-jwt-detect:hover {
+  background: rgba(167, 139, 250, 0.25);
+  border-color: #c4b5fd;
+  box-shadow: 0 0 8px rgba(167, 139, 250, 0.3);
+}
+
+.btn-jwt-remove {
+  flex: 0 0 auto;
+  background: transparent;
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  color: #fca5a5;
+  padding: 6px 8px;
+}
+
+.btn-jwt-remove:hover {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: #ef4444;
+  color: #f87171;
+}
+
+.btn-jwt-action:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+

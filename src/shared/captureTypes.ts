@@ -39,11 +39,24 @@ export interface CaptureRecord {
   pokemonName: string;
   pokemonDexNumber?: number;
   quality: PokemonQuality;
+  qualityMultiplier?: number;
   pokeball: PokeballType;
   iv: IVStats;
   level: number;
   isShiny: boolean;
 }
+
+export const QUALITY_DEFAULT_MULTIPLIERS: Record<PokemonQuality, number> = {
+  divina: 4.0,
+  ancia: 3.0,
+  mitica: 2.0,
+  lendaria: 1.8,
+  epica: 1.5,
+  rara: 1.3,
+  incomum: 1.1,
+  comum: 1.0,
+  fraca: 0.8,
+};
 
 export interface CaptureFilterState {
   quality: 'all' | PokemonQuality;
