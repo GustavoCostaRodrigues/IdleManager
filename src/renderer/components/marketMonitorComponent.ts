@@ -61,6 +61,7 @@ export class MarketMonitorComponent {
 
   // Estado de Permissão de Requisições de Rede
   private isRequestsEnabled = true;
+  private modalSelectedAccountId = 'account_01';
 
   // Referências DOM - Barra Horizontal de Contas
   private elAccountsTrack!: HTMLElement;
@@ -152,7 +153,7 @@ export class MarketMonitorComponent {
 
   constructor(
     private readonly getAccountOptions: () => AccountOption[],
-    private readonly onToast?: (message: string, type?: 'info' | 'success' | 'danger') => void,
+    private readonly onToast?: (message: string, type?: 'info' | 'success' | 'danger', durationMs?: number) => void,
     private readonly onNavigateToAccount?: (accountId: string) => void,
   ) {
     this.marketService = MarketService.getInstance();

@@ -1,8 +1,9 @@
-import type {
-  CaptureFilterState,
-  CaptureRecord,
-  PokeballType,
-  PokemonQuality,
+import {
+  QUALITY_DEFAULT_MULTIPLIERS,
+  type CaptureFilterState,
+  type CaptureRecord,
+  type PokeballType,
+  type PokemonQuality,
 } from '../../shared/captureTypes.js';
 import { CaptureStore } from '../services/captureStore.js';
 
@@ -391,6 +392,11 @@ export class CapturesDashboardComponent {
       // 4. Qualidade Oficial do Poke Idle World
       const qualityClass = `quality-${record.quality.toLowerCase()}`;
       const qualityDisplayName = QUALITY_DISPLAY_NAMES[record.quality] || record.quality;
+      const multiplierVal =
+        typeof record.qualityMultiplier === 'number' && !isNaN(record.qualityMultiplier) && record.qualityMultiplier > 0
+          ? record.qualityMultiplier
+          : (QUALITY_DEFAULT_MULTIPLIERS[record.quality] ?? 1.0);
+      const multiplierText = `x${multiplierVal.toFixed(2)}`;
 
       // 5. Pokébola com SVG nítido
       const pokeballHtml = this.getPokeballMarkup(record.pokeball);
@@ -458,7 +464,7 @@ export class CapturesDashboardComponent {
         <td class="col-quality">
           <span class="quality-badge ${qualityClass}">
             ${record.isShiny ? '<span style="font-size: 11px; margin-right: 4px;">✨</span>' : ''}
-            <span>${qualityDisplayName}</span>
+            <span>${qualityDisplayName} ${multiplierText}</span>
           </span>
         </td>
 

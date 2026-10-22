@@ -113,7 +113,7 @@ export class HuntDashboardComponent {
   /**
    * Tenta detectar automaticamente tokens JWT de webviews caso alguma conta ainda não possua
    */
-  private async tryAutoDetectMissingTokens(): Promise<void> {
+  public async tryAutoDetectMissingTokens(): Promise<void> {
     if (!this.getAccountOptions) return;
     try {
       const options = this.getAccountOptions();
@@ -124,6 +124,10 @@ export class HuntDashboardComponent {
         }
       }
     } catch (_) {}
+  }
+
+  public onViewOpened(): void {
+    this.tryAutoDetectMissingTokens();
   }
 
   private subscribeToService(): void {
@@ -143,6 +147,7 @@ export class HuntDashboardComponent {
         accountId: acc.id,
         accountName: acc.name,
         status: 'idle',
+        requestsEnabled: this.service.isAccountRequestsEnabled(acc.id),
         loots: [],
         totalHuntDollar: 0,
         lastSyncTime: null,
@@ -151,8 +156,9 @@ export class HuntDashboardComponent {
         nextCheckSeconds: 0,
       };
 
+      const requestsEnabled = state.requestsEnabled !== false && this.service.isAccountRequestsEnabled(acc.id);
       const card = document.createElement('article');
-      card.className = 'hunt-card';
+      card.className = `hunt-card${requestsEnabled ? '' : ' requests-disabled'}`;
       card.id = `hunt-card-${acc.id}`;
 
       // Status Badge: 🟢 FARMANDO ou ⚪ OCIOSA
@@ -167,9 +173,28 @@ export class HuntDashboardComponent {
              <span>⚪ OCIOSA</span>
            </span>`;
 
+      // Status do Token JWT da conta (verificado centralizadamente em Ajustes)
+      const marketSvc = MarketService.getInstance();
+      const rawToken = marketSvc.getAccountToken(acc.id);
+      const isJwtActive = marketSvc.isAccountJwtActive(acc.id);
+      const isScreenEnabled = this.service.isScreenRequestsEnabled();
+
+      let tokenIndicatorHtml = '';
+      if (!rawToken) {
+        tokenIndicatorHtml = `<span class="hunt-token-tag hunt-token-missing" title="Sem Token JWT (Configure na tela de Ajustes)">⚠️ Sem JWT</span>`;
+      } else if (!isJwtActive) {
+        tokenIndicatorHtml = `<span class="hunt-token-tag hunt-token-disabled" title="Token JWT desativado na tela de Ajustes">🔒 JWT Inativo</span>`;
+      } else {
+        tokenIndicatorHtml = `<span class="hunt-token-tag hunt-token-ok" title="Token JWT Ativo e Autenticado">🔑 JWT OK</span>`;
+      }
+
       // Aviso discreto de sincronização/erro ou contagem de jitter
       let syncBadgeHtml = '';
-      if (state.isSyncing) {
+      if (!isScreenEnabled) {
+        syncBadgeHtml = `<span class="hunt-disabled-tag" title="Requisições da tela da Hunt desativadas na tela de Ajustes">⏸️ Tela Pausada</span>`;
+      } else if (!requestsEnabled) {
+        syncBadgeHtml = `<span class="hunt-disabled-tag" title="Requisições desta conta desativadas na tela de Ajustes">⏸️ Conta Pausada</span>`;
+      } else if (state.isSyncing) {
         syncBadgeHtml = `<span class="hunt-sync-spinner" title="Sincronizando inventário e capturas..."></span>`;
       } else if (state.syncError) {
         syncBadgeHtml = `<span class="hunt-error-notice" title="${state.syncError}">
@@ -220,6 +245,7 @@ export class HuntDashboardComponent {
           </div>
 
           <div class="hunt-card-header-right">
+            ${tokenIndicatorHtml}
             ${syncBadgeHtml}
           </div>
         </header>
@@ -262,7 +288,9 @@ export class HuntDashboardComponent {
       });
 
       // Clique no cabeçalho permite focar na respectiva conta
-      card.querySelector('.hunt-card-header')?.addEventListener('click', () => {
+      card.querySelector('.hunt-card-header')?.addEventListener('click', (e) => {
+        const target = e.target as HTMLElement;
+        if (target.closest('.hunt-card-switch-wrapper') || target.closest('input') || target.closest('label')) return;
         this.onNavigateToAccount?.(acc.id);
       });
 

@@ -97,7 +97,7 @@ class PokeIdleApp {
     );
     this.ivCalcViewport.appendChild(this.ivCalculatorComponent.element);
 
-    // Inicializa a Tela de Ajustes & Alertas de Notificação
+    // Inicializa a Tela de Ajustes, Governança de Requisições & Tokens JWT
     this.settingsComponent = new SettingsComponent(
       (interval) => {
         this.accountManager.setAllIntervals(interval);
@@ -107,6 +107,10 @@ class PokeIdleApp {
         this.triggerPulsingAlertSimulation();
       },
       (msg, type) => this.toastManager.show(msg, type),
+      () =>
+        this.accountManager
+          .getCards()
+          .map((c) => ({ id: c.config.id, name: c.config.name, webview: c.webview })),
     );
     this.settingsViewport.appendChild(this.settingsComponent.element);
 
@@ -126,7 +130,7 @@ class PokeIdleApp {
         this.accountManager
           .getCards()
           .map((c) => ({ id: c.config.id, name: c.config.name, webview: c.webview })),
-      (msg, type) => this.toastManager.show(msg, type),
+      (msg, type, duration) => this.toastManager.show(msg, type, duration),
       (accountId) => this.navigateToAccount(accountId),
     );
     this.marketViewport.appendChild(this.marketMonitorComponent.element);
@@ -205,6 +209,7 @@ class PokeIdleApp {
     } else if (view === 'hunt') {
       this.navLogsBtn?.classList.add('active');
       this.huntViewport.classList.add('active');
+      this.huntDashboard.onViewOpened();
     } else if (view === 'captures') {
       this.clearPulsingAlert();
       this.navCapturesBtn?.classList.add('active');
@@ -223,6 +228,7 @@ class PokeIdleApp {
     } else if (view === 'settings') {
       this.navSettingsBtn?.classList.add('active');
       this.settingsViewport.classList.add('active');
+      this.settingsComponent.loadCurrentSettings();
     }
   }
 

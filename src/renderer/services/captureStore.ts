@@ -167,6 +167,7 @@ export class CaptureStore {
       pokemonDexNumber?: number;
       level?: number;
       quality?: PokemonQuality;
+      qualityMultiplier?: number;
       pokeball?: PokeballType;
       ivPoints?: number;
       ivMaxPoints?: number;
@@ -221,6 +222,7 @@ export class CaptureStore {
           pokemonName: cleanName,
           pokemonDexNumber: item.pokemonDexNumber,
           quality: item.quality || 'comum',
+          qualityMultiplier: item.qualityMultiplier,
           pokeball: item.pokeball || 'pokeball',
           iv,
           level: item.level || 1,

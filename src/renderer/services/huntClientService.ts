@@ -16,6 +16,7 @@ export interface AccountHuntCardState {
   accountId: string;
   accountName: string;
   status: 'farming' | 'idle';
+  requestsEnabled: boolean;
   loots: HuntLootItem[];
   totalHuntDollar: number;
   lastSyncTime: number | null;
@@ -23,6 +24,9 @@ export interface AccountHuntCardState {
   isSyncing: boolean;
   nextCheckSeconds: number;
 }
+
+const STORAGE_KEY_DISABLED_ACCOUNTS = 'poke_idle_hunt_disabled_accounts';
+const STORAGE_KEY_SCREEN_REQUESTS_ENABLED = 'poke_idle_hunt_screen_requests_enabled';
 
 type HuntClientListener = (states: Map<string, AccountHuntCardState>) => void;
 
@@ -36,6 +40,9 @@ export class HuntClientService {
   private static instance: HuntClientService | null = null;
   private states = new Map<string, AccountHuntCardState>();
   private baselines = new Map<string, AccountBaseline>();
+  private disabledAccountIds = new Set<string>();
+  private screenRequestsEnabled = true;
+  private tokenUnsubscribe: (() => void) | null = null;
   private timers: Record<string, any> = {};
   private nextCheckTimes: Record<string, number> = {};
   private listeners = new Set<HuntClientListener>();
@@ -43,9 +50,12 @@ export class HuntClientService {
   private isDestroyed = false;
 
   private constructor() {
+    this.loadScreenRequestsEnabled();
+    this.loadDisabledAccounts();
     this.initAccounts();
     this.startCountdownTicker();
     this.startDesynchronizedLoops();
+    this.setupMarketTokenListener();
   }
 
   public static getInstance(): HuntClientService {
@@ -55,16 +65,152 @@ export class HuntClientService {
     return HuntClientService.instance;
   }
 
+  private loadScreenRequestsEnabled(): void {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_SCREEN_REQUESTS_ENABLED);
+      if (saved !== null) {
+        this.screenRequestsEnabled = saved !== 'false';
+      }
+    } catch (_) {}
+  }
+
+  public isScreenRequestsEnabled(): boolean {
+    return this.screenRequestsEnabled;
+  }
+
+  public setScreenRequestsEnabled(enabled: boolean): void {
+    this.screenRequestsEnabled = !!enabled;
+    try {
+      localStorage.setItem(STORAGE_KEY_SCREEN_REQUESTS_ENABLED, String(this.screenRequestsEnabled));
+    } catch (_) {}
+
+    if (!this.screenRequestsEnabled) {
+      // Cancela todos os timers agendados
+      for (const accountId of Object.keys(this.timers)) {
+        if (this.timers[accountId]) {
+          clearTimeout(this.timers[accountId]);
+          delete this.timers[accountId];
+        }
+      }
+      this.nextCheckTimes = {};
+      for (const state of this.states.values()) {
+        state.isSyncing = false;
+        state.nextCheckSeconds = 0;
+        state.syncError = 'Requisições da tela desativadas';
+      }
+    } else {
+      // Reativa as requisições para contas habilitadas
+      for (const state of this.states.values()) {
+        if (state.syncError === 'Requisições da tela desativadas') {
+          state.syncError = null;
+        }
+      }
+      this.startDesynchronizedLoops();
+    }
+
+    this.notify();
+  }
+
+  private loadDisabledAccounts(): void {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY_DISABLED_ACCOUNTS);
+      if (raw) {
+        const list = JSON.parse(raw);
+        if (Array.isArray(list)) {
+          this.disabledAccountIds = new Set(list);
+        }
+      }
+    } catch (_) {}
+  }
+
+  private saveDisabledAccounts(): void {
+    try {
+      localStorage.setItem(
+        STORAGE_KEY_DISABLED_ACCOUNTS,
+        JSON.stringify(Array.from(this.disabledAccountIds)),
+      );
+    } catch (_) {}
+  }
+
+  public isAccountRequestsEnabled(accountId: string): boolean {
+    return !this.disabledAccountIds.has(accountId);
+  }
+
+  public setAccountRequestsEnabled(accountId: string, enabled: boolean): void {
+    if (enabled) {
+      this.disabledAccountIds.delete(accountId);
+    } else {
+      this.disabledAccountIds.add(accountId);
+    }
+    this.saveDisabledAccounts();
+
+    const state = this.states.get(accountId);
+    if (state) {
+      state.requestsEnabled = enabled;
+      if (!enabled) {
+        if (this.timers[accountId]) {
+          clearTimeout(this.timers[accountId]);
+          delete this.timers[accountId];
+        }
+        state.isSyncing = false;
+        state.nextCheckSeconds = 0;
+        state.syncError = 'Requisições desativadas';
+      } else {
+        if (state.syncError === 'Requisições desativadas') {
+          state.syncError = null;
+        }
+        if (this.screenRequestsEnabled) {
+          this.checkAccount(accountId);
+        }
+      }
+    }
+
+    this.notify();
+  }
+
+  private setupMarketTokenListener(): void {
+    this.tokenUnsubscribe = MarketService.getInstance().onTokenChange((accountId, token) => {
+      const state = this.states.get(accountId);
+      if (!state) return;
+
+      const isJwtActive = MarketService.getInstance().isAccountJwtActive(accountId);
+      if (!isJwtActive) {
+        state.syncError = 'JWT Desativado em Ajustes';
+        this.notify();
+        return;
+      }
+
+      if (token) {
+        if (
+          state.syncError === 'Token não configurado' ||
+          state.syncError === 'Token expirado' ||
+          state.syncError === 'JWT Desativado em Ajustes'
+        ) {
+          state.syncError = null;
+        }
+        this.notify();
+        if (this.screenRequestsEnabled && this.isAccountRequestsEnabled(accountId)) {
+          this.checkAccount(accountId);
+        }
+      } else {
+        state.syncError = 'Token não configurado';
+        this.notify();
+      }
+    });
+  }
+
   private initAccounts(): void {
     for (const acc of DEFAULT_ACCOUNTS) {
+      const isReqEnabled = this.isAccountRequestsEnabled(acc.id);
       this.states.set(acc.id, {
         accountId: acc.id,
         accountName: acc.name,
         status: 'idle',
+        requestsEnabled: isReqEnabled,
         loots: [],
         totalHuntDollar: 0,
         lastSyncTime: null,
-        syncError: null,
+        syncError: isReqEnabled ? null : 'Requisições desativadas',
         isSyncing: false,
         nextCheckSeconds: 0,
       });
@@ -109,6 +255,9 @@ export class HuntClientService {
     ];
 
     DEFAULT_ACCOUNTS.forEach((acc, index) => {
+      if (!this.isAccountRequestsEnabled(acc.id)) {
+        return;
+      }
       const offset = initialOffsetsMs[index] || (index * 7000 + 2000);
       this.nextCheckTimes[acc.id] = Date.now() + offset;
       const state = this.states.get(acc.id);
@@ -117,7 +266,7 @@ export class HuntClientService {
       }
 
       this.timers[acc.id] = setTimeout(() => {
-        if (!this.isDestroyed) {
+        if (!this.isDestroyed && this.isAccountRequestsEnabled(acc.id)) {
           this.checkAccount(acc.id);
         }
       }, offset);
@@ -136,7 +285,7 @@ export class HuntClientService {
 
       for (const [id, targetTime] of Object.entries(this.nextCheckTimes)) {
         const state = this.states.get(id);
-        if (state && !state.isSyncing) {
+        if (state && !state.isSyncing && this.isAccountRequestsEnabled(id)) {
           const remaining = Math.max(0, Math.ceil((targetTime - now) / 1000));
           if (state.nextCheckSeconds !== remaining) {
             state.nextCheckSeconds = remaining;
@@ -160,7 +309,7 @@ export class HuntClientService {
       delete this.timers[accountId];
     }
 
-    if (this.isDestroyed) return;
+    if (this.isDestroyed || !this.isAccountRequestsEnabled(accountId)) return;
 
     // Jitter dinâmico obrigatório: randômico entre 25 a 45 segundos
     const jitterDelayMs = 25000 + Math.floor(Math.random() * 20000);
@@ -172,7 +321,7 @@ export class HuntClientService {
     }
 
     this.timers[accountId] = setTimeout(() => {
-      if (!this.isDestroyed) {
+      if (!this.isDestroyed && this.screenRequestsEnabled && this.isAccountRequestsEnabled(accountId)) {
         this.checkAccount(accountId);
       }
     }, jitterDelayMs);
@@ -186,12 +335,38 @@ export class HuntClientService {
     const baseline = this.baselines.get(accountId);
     if (!state || !baseline) return;
 
+    if (!this.screenRequestsEnabled) {
+      state.isSyncing = false;
+      state.syncError = 'Requisições da tela desativadas';
+      state.nextCheckSeconds = 0;
+      this.notify();
+      return;
+    }
+
+    if (!this.isAccountRequestsEnabled(accountId)) {
+      state.isSyncing = false;
+      state.requestsEnabled = false;
+      state.syncError = 'Requisições desativadas';
+      state.nextCheckSeconds = 0;
+      this.notify();
+      return;
+    }
+
+    if (!MarketService.getInstance().isAccountJwtActive(accountId)) {
+      state.isSyncing = false;
+      state.syncError = 'JWT Desativado em Ajustes';
+      state.status = 'idle';
+      state.nextCheckSeconds = 0;
+      this.notify();
+      return;
+    }
+
     state.isSyncing = true;
     this.notify();
 
     try {
       // 1. Obtém o JWT Token da conta através do MarketService
-      let token = MarketService.getInstance().getAccountToken(accountId);
+      let token = MarketService.getInstance().getActiveAccountToken(accountId);
       if (!token) {
         state.syncError = 'Token não configurado';
         state.status = 'idle';
@@ -442,9 +617,13 @@ export class HuntClientService {
    */
   public async refreshAll(): Promise<void> {
     const accountIds = DEFAULT_ACCOUNTS.map((a) => a.id);
+    let activeIdx = 0;
 
-    for (let i = 0; i < accountIds.length; i++) {
-      const accId = accountIds[i];
+    accountIds.forEach((accId) => {
+      if (!this.isAccountRequestsEnabled(accId)) {
+        return;
+      }
+
       if (this.timers[accId]) {
         clearTimeout(this.timers[accId]);
         delete this.timers[accId];
@@ -452,11 +631,12 @@ export class HuntClientService {
 
       // Micro-escalonamento para segurança
       setTimeout(() => {
-        if (!this.isDestroyed) {
+        if (!this.isDestroyed && this.isAccountRequestsEnabled(accId)) {
           this.checkAccount(accId);
         }
-      }, i * 250);
-    }
+      }, activeIdx * 250);
+      activeIdx++;
+    });
   }
 
   /**
@@ -472,6 +652,8 @@ export class HuntClientService {
 
   public destroy(): void {
     this.isDestroyed = true;
+    this.tokenUnsubscribe?.();
+    this.tokenUnsubscribe = null;
     if (this.countdownInterval) {
       clearInterval(this.countdownInterval);
       this.countdownInterval = null;

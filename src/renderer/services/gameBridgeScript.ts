@@ -57,6 +57,61 @@ export const GAME_BRIDGE_INJECTION_SCRIPT = `
       } catch (e) {}
     }
 
+    // Monitoramento contínuo de Tokens JWT na sessão/storage
+    function checkAndEmitToken() {
+      try {
+        let token = null;
+        const raw = sessionStorage.getItem('pokeweb:tokens') || localStorage.getItem('pokeweb:tokens');
+        if (raw) {
+          try {
+            const parsed = JSON.parse(raw);
+            token = parsed && parsed.accessToken ? parsed.accessToken : (typeof parsed === 'string' && parsed.startsWith('ey') ? parsed : null);
+          } catch (_) {}
+        }
+        if (!token) {
+          for (let i = 0; i < localStorage.length; i++) {
+            const k = localStorage.key(i);
+            if (k && k.toLowerCase().includes('token')) {
+              const val = localStorage.getItem(k);
+              if (val && val.startsWith('ey')) { token = val; break; }
+              try {
+                const p = JSON.parse(val);
+                if (p && p.accessToken) { token = p.accessToken; break; }
+              } catch (_) {}
+            }
+          }
+        }
+        if (token && typeof token === 'string' && token.startsWith('ey')) {
+          if (shouldEmit('TOKEN:' + token.substring(0, 30), 10000)) {
+            emitTelemetry({
+              type: 'TOKEN_DETECTED',
+              token: token,
+              timestamp: Date.now(),
+            });
+          }
+        }
+      } catch (_) {}
+    }
+
+    // Intercepta alterações no localStorage/sessionStorage para detecção imediata no momento do login
+    try {
+      ['localStorage', 'sessionStorage'].forEach((storageName) => {
+        const storage = window[storageName];
+        if (storage && !storage.__pokeHooked) {
+          storage.__pokeHooked = true;
+          const origSet = storage.setItem;
+          storage.setItem = function(key, val) {
+            origSet.apply(this, arguments);
+            try {
+              if (typeof key === 'string' && (key.includes('token') || key === 'pokeweb:tokens')) {
+                checkAndEmitToken();
+              }
+            } catch (_) {}
+          };
+        }
+      });
+    } catch (_) {}
+
     // Normalizador oficial das 9 qualidades do Poke Idle World
     function normalizeQuality(rawText) {
       const str = (rawText || '').toLowerCase().trim();
@@ -659,15 +714,37 @@ export const GAME_BRIDGE_INJECTION_SCRIPT = `
           '(() => {',
           '  if (window.__POKE_WS_HOOKED__) return;',
           '  window.__POKE_WS_HOOKED__ = true;',
+          '  function dispatchPokeMsg(msg) {',
+          '    if (!msg || typeof msg !== "object") return;',
+          '    try {',
+          '      window.dispatchEvent(new CustomEvent("poke-ws-message", { detail: msg }));',
+          '    } catch (_) {}',
+          '  }',
           '  function attachWsListener(ws) {',
           '    if (!ws || ws.__pokeWsHooked) return;',
           '    ws.__pokeWsHooked = true;',
           '    ws.addEventListener("message", function(event) {',
           '      try {',
           '        if (typeof event.data !== "string") return;',
-          '        const data = JSON.parse(event.data);',
-          '        if (data && data.type) {',
-          '          window.dispatchEvent(new CustomEvent("poke-ws-message", { detail: data }));',
+          '        var raw = event.data;',
+          '        if (raw.charCodeAt(0) >= 48 && raw.charCodeAt(0) <= 57) {',
+          '          var b1 = raw.indexOf("[");',
+          '          var b2 = raw.indexOf("{");',
+          '          var s = -1;',
+          '          if (b1 !== -1 && b2 !== -1) s = Math.min(b1, b2);',
+          '          else if (b1 !== -1) s = b1;',
+          '          else if (b2 !== -1) s = b2;',
+          '          if (s !== -1) raw = raw.substring(s);',
+          '        }',
+          '        var parsed = JSON.parse(raw);',
+          '        if (Array.isArray(parsed)) {',
+          '          if (typeof parsed[0] === "string") {',
+          '            dispatchPokeMsg({ type: parsed[0], data: parsed[1], poke: parsed[1], payload: parsed[1] });',
+          '          } else {',
+          '            for (var i = 0; i < parsed.length; i++) dispatchPokeMsg(parsed[i]);',
+          '          }',
+          '        } else if (parsed && typeof parsed === "object") {',
+          '          dispatchPokeMsg(parsed);',
           '        }',
           '      } catch (_) {}',
           '    });',
@@ -700,27 +777,141 @@ export const GAME_BRIDGE_INJECTION_SCRIPT = `
       } catch (_) {}
     }
 
-    // Processa mensagens reais recebidas pelo WebSocket do jogo
+    // Extrai os dados completos do Pokémon passivamente direto do payload WebSocket do jogo
+    function extractCaptureFromWsPayload(msg) {
+      if (!msg || typeof msg !== 'object') return null;
+
+      // Se for catch-result com success: false, é fuga ou falha de captura
+      if (msg.success === false) return null;
+
+      // O Pokémon pode vir em msg.poke, msg.pokemon, msg.payload, msg.data, msg.result ou no próprio msg
+      const p = msg.poke || msg.pokemon || msg.payload || msg.data || msg.result || msg;
+      if (!p || typeof p !== 'object') return null;
+
+      // 1. Nome do Pokémon
+      const rawName = String(
+        p.name || p.pokemonName || p.speciesName || p.cleanName || (lastTargetPokemon && lastTargetPokemon.name) || ''
+      ).trim();
+      const cleanName = rawName.replace(/.*(?:Captura|selvagem|Loja|\\d)+/gi, '').trim() || rawName;
+
+      // 2. Número da Pokédex (speciesId)
+      const rawDex = p.speciesId ?? p.species_id ?? p.speciesIdNumber ?? p.species ?? p.dex ?? p.pokedexId ?? (lastTargetPokemon && lastTargetPokemon.dex);
+      const speciesId = typeof rawDex === 'number' ? rawDex : (parseInt(rawDex, 10) || undefined);
+
+      if (!cleanName && !speciesId) return null;
+
+      // 3. Pontuação de IV oficial (escala 0 a 192)
+      let ivPts = 0;
+      if (typeof p.ivTotal === 'number') {
+        ivPts = p.ivTotal;
+      } else if (typeof p.ivPoints === 'number') {
+        ivPts = p.ivPoints;
+      } else if (typeof p.iv === 'number') {
+        ivPts = p.iv;
+      } else if (p.iv && typeof p.iv.total === 'number') {
+        ivPts = p.iv.total;
+      } else if (typeof p.ivScore === 'number') {
+        ivPts = p.ivScore;
+      }
+      const ivPct = ivPts > 0 ? Math.round((ivPts / 192) * 100 * 10) / 10 : 0;
+
+      // 4. Multiplicador de qualidade oficial (ex: 1.80)
+      const rawQuality = p.quality !== undefined ? p.quality : (p.qualityMultiplier !== undefined ? p.qualityMultiplier : p.multiplier);
+      let qMult = undefined;
+      if (typeof rawQuality === 'number' && !isNaN(rawQuality)) {
+        qMult = rawQuality;
+      } else if (typeof rawQuality === 'string') {
+        const parsed = parseFloat(rawQuality.replace(/[^0-9.]/g, ''));
+        if (!isNaN(parsed) && parsed > 0) qMult = parsed;
+      }
+      const qualityStr = qualityFromNumberOrString(rawQuality);
+
+      // 5. Pokébola utilizada
+      const ballRaw = p.ballName || p.ball || p.pokeball || (lastKnownBall && lastKnownBall.name) || 'Ultra Ball';
+      const pokeball = normalizePokeball(ballRaw);
+
+      // 6. Shiny
+      const isShiny = Boolean(p.shiny || p.isShiny);
+
+      // 7. Nível
+      const level = typeof p.level === 'number' ? p.level : (typeof p.lvl === 'number' ? p.lvl : (lastTargetPokemon && lastTargetPokemon.level) || 1);
+
+      // 8. Timestamp
+      let ts = Date.now();
+      if (p.at) {
+        const parsedAt = new Date(p.at).getTime();
+        if (!isNaN(parsedAt)) ts = parsedAt;
+      } else if (p.timestamp) {
+        ts = Number(p.timestamp);
+      }
+
+      const id = String(p.id || p._id || ('ws-' + ts + '-' + (speciesId || cleanName)));
+
+      return {
+        id,
+        pokemonName: cleanName || 'Pokémon',
+        pokemonDexNumber: speciesId,
+        level,
+        quality: qualityStr,
+        qualityMultiplier: qMult,
+        pokeball,
+        ivPoints: ivPts,
+        ivMaxPoints: 192,
+        ivPercentage: ivPct,
+        isShiny,
+        timestamp: ts,
+      };
+    }
+
+    // Processa mensagens reais recebidas pelo WebSocket do jogo sem disparar NENHUMA requisição HTTP
     function handleIncomingWsMessage(msg) {
       if (!msg || typeof msg !== 'object') return;
 
-      // A) Confirmação definitiva de captura com sucesso em tempo real (catch-result)
-      if (msg.type === 'catch-result') {
-        if (msg.success) {
-          // Captura confirmada com sucesso pelo servidor! Sincroniza imediatamente o histórico oficial com IV e dados reais
-          scheduleLogSync(200);
+      const type = String(msg.type || msg.action || msg.event || '').toLowerCase();
+
+      // A) Confirmação definitiva de captura com sucesso (catch-result)
+      if (type === 'catch-result') {
+        if (msg.success !== false) {
+          const cap = extractCaptureFromWsPayload(msg);
+          if (cap) {
+            emitTelemetry({
+              type: 'BATCH_CAPTURES',
+              captures: [cap],
+              timestamp: cap.timestamp,
+            });
+          }
         }
         return;
       }
 
       // B) Evento de novo Pokémon inserido no time/box (poke-delta)
-      if (msg.type === 'poke-delta' && msg.poke) {
-        scheduleLogSync(300);
+      if (type === 'poke-delta') {
+        const cap = extractCaptureFromWsPayload(msg);
+        if (cap) {
+          emitTelemetry({
+            type: 'BATCH_CAPTURES',
+            captures: [cap],
+            timestamp: cap.timestamp,
+          });
+        }
         return;
       }
 
-      // C) Evento de atualização de Pokébolas via WebSocket
-      if (msg.type === 'balls' && msg.counts) {
+      // C) Outras variações eventuais de captura em tempo real
+      if (type === 'capture' || type === 'catch' || type === 'pokemon-caught') {
+        const cap = extractCaptureFromWsPayload(msg);
+        if (cap) {
+          emitTelemetry({
+            type: 'BATCH_CAPTURES',
+            captures: [cap],
+            timestamp: cap.timestamp,
+          });
+        }
+        return;
+      }
+
+      // D) Evento de atualização de Pokébolas via WebSocket
+      if (type === 'balls' && msg.counts) {
         scanActiveCapturePanel();
         return;
       }
@@ -733,75 +924,6 @@ export const GAME_BRIDGE_INJECTION_SCRIPT = `
           handleIncomingWsMessage(e.detail);
         } catch (_) {}
       });
-    }
-
-    // -------------------------------------------------------------
-    // 3.1 SINCRONIZAÇÃO PASSIVA E AUTÊNTICA COM /api/game/capture-log
-    // -------------------------------------------------------------
-    let logSyncTimeout = null;
-    let lastLogSyncTime = 0;
-
-    function scheduleLogSync(delayMs = 300) {
-      if (logSyncTimeout) clearTimeout(logSyncTimeout);
-      logSyncTimeout = setTimeout(() => {
-        logSyncTimeout = null;
-        fetchCaptureLogSafely();
-      }, delayMs);
-    }
-
-    async function fetchCaptureLogSafely() {
-      const now = Date.now();
-      if (now - lastLogSyncTime < 800) return;
-      lastLogSyncTime = now;
-
-      try {
-        let token = null;
-        try {
-          const raw = sessionStorage.getItem('pokeweb:tokens') || localStorage.getItem('pokeweb:tokens');
-          if (raw) {
-            const parsed = JSON.parse(raw);
-            token = parsed && parsed.accessToken ? parsed.accessToken : null;
-          }
-        } catch (_) {}
-
-        if (!token) return;
-
-        const res = await fetch('/api/game/capture-log?filter=all', {
-          headers: {
-            Authorization: 'Bearer ' + token,
-          },
-        });
-
-        if (!res.ok) return;
-        const data = await res.json();
-        if (!data || !Array.isArray(data.rows) || data.rows.length === 0) return;
-
-        const list = data.rows.map((row) => {
-          const ivPts = typeof row.ivTotal === 'number' ? row.ivTotal : 0;
-          const ivPct = ivPts > 0 ? Math.round((ivPts / 192) * 100 * 10) / 10 : 0;
-          const rawName = String(row.name || 'Pokémon').trim();
-          const cleanName = rawName.replace(/.*(?:Captura|selvagem|Loja|\\d)+/gi, '').trim() || rawName;
-          return {
-            id: String(row.id || ''),
-            pokemonName: cleanName,
-            pokemonDexNumber: row.speciesId,
-            level: row.level || 1,
-            quality: qualityFromNumberOrString(row.quality),
-            pokeball: normalizePokeball(row.ballName || ''),
-            ivPoints: ivPts,
-            ivMaxPoints: 192,
-            ivPercentage: ivPct,
-            isShiny: Boolean(row.shiny),
-            timestamp: row.at ? new Date(row.at).getTime() : Date.now(),
-          };
-        });
-
-        emitTelemetry({
-          type: 'BATCH_CAPTURES',
-          captures: list,
-          timestamp: Date.now(),
-        });
-      } catch (_) {}
     }
 
     // -------------------------------------------------------------
@@ -862,18 +984,11 @@ export const GAME_BRIDGE_INJECTION_SCRIPT = `
       if (isScanning) return;
       isScanning = true;
       try {
+        checkAndEmitToken();
         hookPotionUsageActions();
         scanActiveCapturePanel();
         scanActivePotionSupply();
         scanHuntAnalyzer();
-
-        // Sincronização inicial oficial ao detectar login
-        if (!window.__POKE_LOG_INITIAL_SYNCED__ && isGamePageLoggedIn(getBridgeDocs())) {
-          window.__POKE_LOG_INITIAL_SYNCED__ = true;
-          setTimeout(() => {
-            fetchCaptureLogSafely();
-          }, 1500);
-        }
       } catch (err) {
         console.warn('[PokeBridge] Erro no scan:', err);
       } finally {
