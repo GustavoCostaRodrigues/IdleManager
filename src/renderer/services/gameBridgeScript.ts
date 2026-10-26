@@ -5,13 +5,12 @@
  * Funcionalidades:
  * 1. Lê diretamente da tela ativa de caça o painel "🎯 CAPTURA" (canto inferior direito):
  *    - Quantidade e tipo da Pokébola em uso (ex: 128 Ultra Balls).
- *    - Pokémon selvagem alvo (ex: Caterpie Lv 1).
- *    - Intercepta cliques no botão "Lançar" e arremessos automáticos.
- * 2. Monitora o combate ativo nos cards centrais e mensagens de chat/sistema.
- * 3. Sincroniza dados consolidados dos modais "HUNT ANALYZER" e "LOG DE CAPTURAS" (quando abertos ou no DOM).
- * 4. Varre exaustivamente o localStorage e sessionStorage do jogo para recuperar históricos salvos.
- * 5. Emite eventos estruturados em tempo real (SUPPLY_STATUS, CAPTURE, BATCH_CAPTURES, HUNT_SYNC)
- *    para o processo Renderer com zero latência.
+ *    - Intercepta cliques no botão "Lançar" para atualizar contadores locais.
+ * 2. Monitora o combate ativo nos cards centrais e consumo de poções.
+ * 3. Sincroniza dados consolidados do modal "HUNT ANALYZER" (quando aberto ou no DOM).
+ * 4. Captura tokens JWT de autenticação das contas no storage para governança de APIs.
+ * 5. ZERO WEBSOCKET PASSIVO: O app não escuta frames de WebSocket ou telemetria em segundo plano
+ *    dedicada às capturas. O Dashboard de Capturas opera exclusivamente sob demanda via requisições HTTP manuais.
  */
 
 export const GAME_BRIDGE_INJECTION_SCRIPT = `
@@ -110,6 +109,49 @@ export const GAME_BRIDGE_INJECTION_SCRIPT = `
           };
         }
       });
+    } catch (_) {}
+
+    // Interceptação passiva de tráfego de rede para detecção de presença no Mercado (Zero polling, Zero OCR)
+    try {
+      if (typeof window.fetch === 'function' && !window.fetch.__pokeMarketHooked) {
+        const origFetch = window.fetch;
+        const wrappedFetch = function(resource, init) {
+          try {
+            const url = typeof resource === 'string' ? resource : (resource && resource.url ? resource.url : '');
+            if (url && (url.includes('/api/game/market') || url.includes('api/game/market'))) {
+              if (shouldEmit('MARKET_REQ', 5000)) {
+                emitTelemetry({
+                  type: 'MARKET_PRESENCE_DETECTED',
+                  url: url,
+                  timestamp: Date.now(),
+                });
+              }
+            }
+          } catch (_) {}
+          return origFetch.apply(this, arguments);
+        };
+        wrappedFetch.__pokeMarketHooked = true;
+        window.fetch = wrappedFetch;
+      }
+
+      if (typeof window.XMLHttpRequest !== 'undefined' && !window.XMLHttpRequest.prototype.__pokeMarketHooked) {
+        const origOpen = window.XMLHttpRequest.prototype.open;
+        window.XMLHttpRequest.prototype.open = function(method, url) {
+          try {
+            if (typeof url === 'string' && (url.includes('/api/game/market') || url.includes('api/game/market'))) {
+              if (shouldEmit('MARKET_REQ_XHR', 5000)) {
+                emitTelemetry({
+                  type: 'MARKET_PRESENCE_DETECTED',
+                  url: url,
+                  timestamp: Date.now(),
+                });
+              }
+            }
+          } catch (_) {}
+          return origOpen.apply(this, arguments);
+        };
+        window.XMLHttpRequest.prototype.__pokeMarketHooked = true;
+      }
     } catch (_) {}
 
     // Normalizador oficial das 9 qualidades do Poke Idle World
@@ -696,238 +738,7 @@ export const GAME_BRIDGE_INJECTION_SCRIPT = `
     }
 
     // -------------------------------------------------------------
-    // 3. INTERCEPTAÇÃO PASSIVA DO WEBSOCKET NATIVO DO POKE IDLE WORLD
-    // -------------------------------------------------------------
-    function installMainWorldHooks() {
-      try {
-        if (window.__POKE_MAIN_WORLD_WS_INSTALLED__) return;
-        const hookId = '__poke_main_world_ws_hook__';
-        const doc = document;
-        if (doc.getElementById(hookId)) {
-          window.__POKE_MAIN_WORLD_WS_INSTALLED__ = true;
-          return;
-        }
-
-        const script = doc.createElement('script');
-        script.id = hookId;
-        const hookCode = [
-          '(() => {',
-          '  if (window.__POKE_WS_HOOKED__) return;',
-          '  window.__POKE_WS_HOOKED__ = true;',
-          '  function dispatchPokeMsg(msg) {',
-          '    if (!msg || typeof msg !== "object") return;',
-          '    try {',
-          '      window.dispatchEvent(new CustomEvent("poke-ws-message", { detail: msg }));',
-          '    } catch (_) {}',
-          '  }',
-          '  function attachWsListener(ws) {',
-          '    if (!ws || ws.__pokeWsHooked) return;',
-          '    ws.__pokeWsHooked = true;',
-          '    ws.addEventListener("message", function(event) {',
-          '      try {',
-          '        if (typeof event.data !== "string") return;',
-          '        var raw = event.data;',
-          '        if (raw.charCodeAt(0) >= 48 && raw.charCodeAt(0) <= 57) {',
-          '          var b1 = raw.indexOf("[");',
-          '          var b2 = raw.indexOf("{");',
-          '          var s = -1;',
-          '          if (b1 !== -1 && b2 !== -1) s = Math.min(b1, b2);',
-          '          else if (b1 !== -1) s = b1;',
-          '          else if (b2 !== -1) s = b2;',
-          '          if (s !== -1) raw = raw.substring(s);',
-          '        }',
-          '        var parsed = JSON.parse(raw);',
-          '        if (Array.isArray(parsed)) {',
-          '          if (typeof parsed[0] === "string") {',
-          '            dispatchPokeMsg({ type: parsed[0], data: parsed[1], poke: parsed[1], payload: parsed[1] });',
-          '          } else {',
-          '            for (var i = 0; i < parsed.length; i++) dispatchPokeMsg(parsed[i]);',
-          '          }',
-          '        } else if (parsed && typeof parsed === "object") {',
-          '          dispatchPokeMsg(parsed);',
-          '        }',
-          '      } catch (_) {}',
-          '    });',
-          '  }',
-          '  if (typeof window.WebSocket !== "undefined" && !window.WebSocket.__pokePatched) {',
-          '    const OriginalWS = window.WebSocket;',
-          '    const PatchedWS = function() {',
-          '      const ws = Reflect.construct(OriginalWS, arguments);',
-          '      attachWsListener(ws);',
-          '      return ws;',
-          '    };',
-          '    PatchedWS.prototype = OriginalWS.prototype;',
-          '    PatchedWS.CONNECTING = OriginalWS.CONNECTING;',
-          '    PatchedWS.OPEN = OriginalWS.OPEN;',
-          '    PatchedWS.CLOSING = OriginalWS.CLOSING;',
-          '    PatchedWS.CLOSED = OriginalWS.CLOSED;',
-          '    PatchedWS.__pokePatched = true;',
-          '    window.WebSocket = PatchedWS;',
-          '    const origSend = OriginalWS.prototype.send;',
-          '    OriginalWS.prototype.send = function() {',
-          '      attachWsListener(this);',
-          '      return origSend.apply(this, arguments);',
-          '    };',
-          '  }',
-          '})();'
-        ].join('\\n');
-        script.textContent = hookCode;
-        (doc.head || doc.documentElement || doc.body).appendChild(script);
-        window.__POKE_MAIN_WORLD_WS_INSTALLED__ = true;
-      } catch (_) {}
-    }
-
-    // Extrai os dados completos do Pokémon passivamente direto do payload WebSocket do jogo
-    function extractCaptureFromWsPayload(msg) {
-      if (!msg || typeof msg !== 'object') return null;
-
-      // Se for catch-result com success: false, é fuga ou falha de captura
-      if (msg.success === false) return null;
-
-      // O Pokémon pode vir em msg.poke, msg.pokemon, msg.payload, msg.data, msg.result ou no próprio msg
-      const p = msg.poke || msg.pokemon || msg.payload || msg.data || msg.result || msg;
-      if (!p || typeof p !== 'object') return null;
-
-      // 1. Nome do Pokémon
-      const rawName = String(
-        p.name || p.pokemonName || p.speciesName || p.cleanName || (lastTargetPokemon && lastTargetPokemon.name) || ''
-      ).trim();
-      const cleanName = rawName.replace(/.*(?:Captura|selvagem|Loja|\\d)+/gi, '').trim() || rawName;
-
-      // 2. Número da Pokédex (speciesId)
-      const rawDex = p.speciesId ?? p.species_id ?? p.speciesIdNumber ?? p.species ?? p.dex ?? p.pokedexId ?? (lastTargetPokemon && lastTargetPokemon.dex);
-      const speciesId = typeof rawDex === 'number' ? rawDex : (parseInt(rawDex, 10) || undefined);
-
-      if (!cleanName && !speciesId) return null;
-
-      // 3. Pontuação de IV oficial (escala 0 a 192)
-      let ivPts = 0;
-      if (typeof p.ivTotal === 'number') {
-        ivPts = p.ivTotal;
-      } else if (typeof p.ivPoints === 'number') {
-        ivPts = p.ivPoints;
-      } else if (typeof p.iv === 'number') {
-        ivPts = p.iv;
-      } else if (p.iv && typeof p.iv.total === 'number') {
-        ivPts = p.iv.total;
-      } else if (typeof p.ivScore === 'number') {
-        ivPts = p.ivScore;
-      }
-      const ivPct = ivPts > 0 ? Math.round((ivPts / 192) * 100 * 10) / 10 : 0;
-
-      // 4. Multiplicador de qualidade oficial (ex: 1.80)
-      const rawQuality = p.quality !== undefined ? p.quality : (p.qualityMultiplier !== undefined ? p.qualityMultiplier : p.multiplier);
-      let qMult = undefined;
-      if (typeof rawQuality === 'number' && !isNaN(rawQuality)) {
-        qMult = rawQuality;
-      } else if (typeof rawQuality === 'string') {
-        const parsed = parseFloat(rawQuality.replace(/[^0-9.]/g, ''));
-        if (!isNaN(parsed) && parsed > 0) qMult = parsed;
-      }
-      const qualityStr = qualityFromNumberOrString(rawQuality);
-
-      // 5. Pokébola utilizada
-      const ballRaw = p.ballName || p.ball || p.pokeball || (lastKnownBall && lastKnownBall.name) || 'Ultra Ball';
-      const pokeball = normalizePokeball(ballRaw);
-
-      // 6. Shiny
-      const isShiny = Boolean(p.shiny || p.isShiny);
-
-      // 7. Nível
-      const level = typeof p.level === 'number' ? p.level : (typeof p.lvl === 'number' ? p.lvl : (lastTargetPokemon && lastTargetPokemon.level) || 1);
-
-      // 8. Timestamp
-      let ts = Date.now();
-      if (p.at) {
-        const parsedAt = new Date(p.at).getTime();
-        if (!isNaN(parsedAt)) ts = parsedAt;
-      } else if (p.timestamp) {
-        ts = Number(p.timestamp);
-      }
-
-      const id = String(p.id || p._id || ('ws-' + ts + '-' + (speciesId || cleanName)));
-
-      return {
-        id,
-        pokemonName: cleanName || 'Pokémon',
-        pokemonDexNumber: speciesId,
-        level,
-        quality: qualityStr,
-        qualityMultiplier: qMult,
-        pokeball,
-        ivPoints: ivPts,
-        ivMaxPoints: 192,
-        ivPercentage: ivPct,
-        isShiny,
-        timestamp: ts,
-      };
-    }
-
-    // Processa mensagens reais recebidas pelo WebSocket do jogo sem disparar NENHUMA requisição HTTP
-    function handleIncomingWsMessage(msg) {
-      if (!msg || typeof msg !== 'object') return;
-
-      const type = String(msg.type || msg.action || msg.event || '').toLowerCase();
-
-      // A) Confirmação definitiva de captura com sucesso (catch-result)
-      if (type === 'catch-result') {
-        if (msg.success !== false) {
-          const cap = extractCaptureFromWsPayload(msg);
-          if (cap) {
-            emitTelemetry({
-              type: 'BATCH_CAPTURES',
-              captures: [cap],
-              timestamp: cap.timestamp,
-            });
-          }
-        }
-        return;
-      }
-
-      // B) Evento de novo Pokémon inserido no time/box (poke-delta)
-      if (type === 'poke-delta') {
-        const cap = extractCaptureFromWsPayload(msg);
-        if (cap) {
-          emitTelemetry({
-            type: 'BATCH_CAPTURES',
-            captures: [cap],
-            timestamp: cap.timestamp,
-          });
-        }
-        return;
-      }
-
-      // C) Outras variações eventuais de captura em tempo real
-      if (type === 'capture' || type === 'catch' || type === 'pokemon-caught') {
-        const cap = extractCaptureFromWsPayload(msg);
-        if (cap) {
-          emitTelemetry({
-            type: 'BATCH_CAPTURES',
-            captures: [cap],
-            timestamp: cap.timestamp,
-          });
-        }
-        return;
-      }
-
-      // D) Evento de atualização de Pokébolas via WebSocket
-      if (type === 'balls' && msg.counts) {
-        scanActiveCapturePanel();
-        return;
-      }
-    }
-
-    if (!window.__POKE_WS_DISPATCH_BOUND__) {
-      window.__POKE_WS_DISPATCH_BOUND__ = true;
-      window.addEventListener('poke-ws-message', (e) => {
-        try {
-          handleIncomingWsMessage(e.detail);
-        } catch (_) {}
-      });
-    }
-
-    // -------------------------------------------------------------
-    // 4.1 INTERCEPTAÇÃO DE AÇÕES DE USO DE POÇÃO E CURA EM TEMPO REAL
+    // 3. INTERCEPTAÇÃO DE AÇÕES DE USO DE POÇÃO E CURA EM TEMPO REAL
     // -------------------------------------------------------------
     function hookPotionUsageActions() {
       try {
@@ -977,7 +788,7 @@ export const GAME_BRIDGE_INJECTION_SCRIPT = `
     }
 
     // -------------------------------------------------------------
-    // 5. CICLO DE EXECUÇÃO LEVE E CONTROLADO (SEM MUTATION OBSERVER INFINITO)
+    // 4. CICLO DE EXECUÇÃO LEVE E CONTROLADO (SEM MUTATION OBSERVER INFINITO)
     // -------------------------------------------------------------
     let isScanning = false;
     function performFullScan() {
@@ -995,10 +806,8 @@ export const GAME_BRIDGE_INJECTION_SCRIPT = `
         isScanning = false;
       }
     }
+    window.__PokeBridgeScan = performFullScan;
     window.__POKE_BRIDGE_SCAN__ = performFullScan;
-
-    // Instala os hooks do WebSocket na página UMA ÚNICA VEZ
-    installMainWorldHooks();
 
     // Emissão inicial imediata dos dados do painel ativo
     performFullScan();

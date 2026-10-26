@@ -1,5 +1,4 @@
 import type { AccountConfig } from '../../shared/types.js';
-import type { IVStats, PokeballType, PokemonQuality } from '../../shared/captureTypes.js';
 import type {
   BallInventoryType,
   PotionInventoryType,
@@ -8,7 +7,6 @@ import type {
 import { AutoClickTask, type AutoClickResult } from './autoClicker.js';
 import { getItemSpriteHtml, getItemSpriteUrl } from './supplyIcons.js';
 import { GAME_BRIDGE_INJECTION_SCRIPT } from '../services/gameBridgeScript.js';
-import { CaptureStore } from '../services/captureStore.js';
 import { HuntStore } from '../services/huntStore.js';
 import { MarketService } from '../services/marketService.js';
 
@@ -648,11 +646,23 @@ export class AccountCardComponent {
       }
     });
 
-    // Previne novos popups externos
+    // Previne novos popups externos e NUNCA recarrega o webview atual com a URL externa
     this.webview.addEventListener('new-window', (e: any) => {
       e.preventDefault();
-      if (e.url) {
-        this.webview.loadURL(e.url);
+      // Não recarrega o webview nem sequestra a sessão da conta com links externos
+    });
+
+    // Blindagem de navegação: impede que cliques acidentais naveguem para fora da rota do jogo
+    this.webview.addEventListener('will-navigate', (e: any) => {
+      const targetUrl = e.url || '';
+      // Permite apenas o domínio oficial do jogo ou localhost
+      if (
+        !targetUrl.startsWith('https://poke.idleworld.online') &&
+        !targetUrl.startsWith('http://localhost') &&
+        !targetUrl.startsWith('http://127.0.0.1')
+      ) {
+        e.preventDefault();
+        console.warn(`[AccountCard:${this.config.id}] Navegação externa prevenida:`, targetUrl);
       }
     });
   }
@@ -893,35 +903,8 @@ export class AccountCardComponent {
         const rawName = payload.pokemonName.trim();
         const pokemonName = rawName.replace(/.*(?:Captura|selvagem|Loja|\d)+/gi, '').trim() || rawName;
         if (pokemonName.toLowerCase().includes('captura') || pokemonName.toLowerCase().includes('selvagem')) return;
-        const level = payload.level && payload.level > 0 ? payload.level : 1;
-        const isShiny = Boolean(payload.isShiny);
-        const pokeball: PokeballType = payload.pokeball || 'pokeball';
-        const quality: PokemonQuality = payload.quality || 'comum';
 
-        let iv: IVStats;
-        if (typeof payload.ivPoints === 'number' && payload.ivPoints > 0) {
-          iv = CaptureStore.calculateIVStats(payload.ivPoints, payload.ivMaxPoints || 192);
-        } else if (typeof payload.ivPercentage === 'number') {
-          iv = CaptureStore.createIVFromPercentage(payload.ivPercentage);
-        } else {
-          iv = CaptureStore.createIVFromPercentage(0);
-        }
-
-        // 1. Registra no CaptureStore (atualiza instantaneamente o feed com cores reais)
-        CaptureStore.getInstance().addCapture({
-          accountId: this.config.id,
-          accountName: this.config.name,
-          pokemonName,
-          pokemonDexNumber: payload.pokemonDexNumber,
-          quality,
-          pokeball,
-          iv,
-          level,
-          isShiny,
-          timestamp: payload.timestamp ?? Date.now(),
-        });
-
-        // 2. Registra na Hunt da Conta e métricas globais
+        // Registra na Hunt da Conta e métricas globais
         HuntStore.getInstance().recordPokemonCatch(this.config.id, true, pokemonName);
         break;
       }
@@ -933,13 +916,8 @@ export class AccountCardComponent {
         break;
       }
 
-      case 'BATCH_CAPTURES': {
-        if (!Array.isArray(payload.captures) || payload.captures.length === 0) return;
-        CaptureStore.getInstance().syncCapturesBatch(
-          this.config.id,
-          this.config.name,
-          payload.captures,
-        );
+      case 'MARKET_PRESENCE_DETECTED': {
+        MarketService.getInstance().setAccountMarketPresence(this.config.id, true);
         break;
       }
 

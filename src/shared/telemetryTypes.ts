@@ -125,6 +125,12 @@ export interface SupplyStatusTelemetry {
   timestamp?: number;
 }
 
+export interface MarketPresenceTelemetry {
+  type: 'MARKET_PRESENCE_DETECTED';
+  url?: string;
+  timestamp?: number;
+}
+
 export type TelemetryPayload =
   | PokemonCaptureTelemetry
   | BatchCapturesTelemetry
@@ -133,7 +139,8 @@ export type TelemetryPayload =
   | ItemDropTelemetry
   | HuntSessionSyncTelemetry
   | SupplyStatusTelemetry
-  | HuntStatusTelemetry;
+  | HuntStatusTelemetry
+  | MarketPresenceTelemetry;
 
 export interface TelemetryMessage {
   channel: 'poke-telemetry';

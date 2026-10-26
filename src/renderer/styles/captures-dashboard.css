@@ -66,6 +66,12 @@
   gap: 4px;
 }
 
+.captures-badges-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .captures-badge-live {
   display: inline-flex;
   align-items: center;
@@ -88,6 +94,46 @@
   background-color: var(--accent-primary);
   box-shadow: 0 0 6px var(--accent-glow);
   animation: pulse-captures 1.5s infinite alternate;
+}
+
+.captures-req-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
+}
+
+.captures-req-badge.active {
+  color: #3fb950;
+  background-color: rgba(63, 185, 80, 0.12);
+  border: 1px solid rgba(63, 185, 80, 0.3);
+}
+
+.captures-req-badge.paused {
+  color: #f85149;
+  background-color: rgba(248, 81, 73, 0.12);
+  border: 1px solid rgba(248, 81, 73, 0.3);
+}
+
+.captures-req-badge .status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.captures-req-badge .status-dot.green {
+  background-color: #3fb950;
+  box-shadow: 0 0 6px rgba(63, 185, 80, 0.6);
+}
+
+.captures-req-badge .status-dot.red {
+  background-color: #f85149;
+  box-shadow: 0 0 6px rgba(248, 81, 73, 0.6);
 }
 
 @keyframes pulse-captures {
@@ -153,6 +199,32 @@
   border-color: var(--accent-primary);
   box-shadow: 0 0 8px var(--accent-glow);
   transform: translateY(-1px);
+}
+
+.btn-capture-action.btn-sync-history {
+  color: var(--accent-primary);
+  border-color: rgba(88, 166, 255, 0.4);
+  background-color: rgba(88, 166, 255, 0.08);
+}
+
+.btn-capture-action.btn-sync-history svg {
+  color: var(--accent-primary);
+  transition: transform var(--transition-fast);
+}
+
+.btn-capture-action.btn-sync-history:hover {
+  background-color: rgba(88, 166, 255, 0.18);
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 10px rgba(88, 166, 255, 0.35);
+}
+
+.btn-capture-action.btn-sync-history.syncing svg {
+  animation: spin-sync 0.8s linear infinite;
+}
+
+@keyframes spin-sync {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 .btn-capture-action.btn-clear-history {

@@ -5,7 +5,6 @@ import type {
   PokemonQuality,
 } from '../../shared/captureTypes.js';
 import type { PokemonCaptureTelemetry } from '../../shared/telemetryTypes.js';
-import { CaptureStore } from '../services/captureStore.js';
 import { HuntStore } from '../services/huntStore.js';
 import { HuntClientService } from '../services/huntClientService.js';
 
@@ -36,56 +35,100 @@ export interface AutoClickResult {
 export const INJECTION_SCRIPT = `
 (() => {
   try {
-    const selectors = ${JSON.stringify(AUTO_CLICK_CONFIG.TARGET_SELECTORS)};
-    let targetButton = null;
+    function getAllGameDocuments() {
+      var docs = [document];
+      try {
+        var frames = document.querySelectorAll('iframe');
+        for (var i = 0; i < frames.length; i++) {
+          try {
+            var fDoc = frames[i].contentDocument || (frames[i].contentWindow && frames[i].contentWindow.document);
+            if (fDoc) docs.push(fDoc);
+          } catch (_) {}
+        }
+      } catch (_) {}
+      return docs;
+    }
 
-    // 1. Busca por seletores prioritários de lançamento / captura
-    for (const sel of selectors) {
-      const btn = document.querySelector(sel);
-      if (btn && !btn.disabled && btn.offsetParent !== null) {
-        targetButton = btn;
-        break;
+    var docs = getAllGameDocuments();
+    var targetButton = null;
+
+    // 1. Procura primeiro e com máxima prioridade pelo botão "Lançar" dentro do painel CAPTURA ativo
+    for (var d = 0; d < docs.length; d++) {
+      var doc = docs[d];
+      if (!doc || !doc.body) continue;
+
+      var candidateBoxes = doc.querySelectorAll('[class*="capture"], [class*="captur"], [class*="panel"], [class*="box"]');
+      for (var bIdx = 0; bIdx < candidateBoxes.length; bIdx++) {
+        var box = candidateBoxes[bIdx];
+        var bTxt = (box.textContent || '').toLowerCase();
+        // O painel de captura oficial sempre contém 'captura' e elementos de caça/lançamento
+        if (bTxt.indexOf('captura') !== -1 && (bTxt.indexOf('selvagem') !== -1 || bTxt.indexOf('lançar') !== -1 || bTxt.indexOf('lancar') !== -1 || bTxt.indexOf('lv') !== -1)) {
+          var boxButtons = Array.from(box.querySelectorAll('button, div[role="button"], [class*="btn"]'));
+          var btnInBox = boxButtons.find(function(b) {
+            if (b.disabled || b.offsetParent === null) return false;
+            // CRÍTICO: NUNCA clica em links <a> para evitar navegação e recarregamento da página
+            if (b.tagName === 'A' || b.hasAttribute('href')) return false;
+            var t = (b.textContent || '').trim().toLowerCase();
+            return t === 'lançar' || t === 'lancar' || t === 'catch';
+          });
+          if (btnInBox) {
+            targetButton = btnInBox;
+            break;
+          }
+        }
+      }
+      if (targetButton) break;
+    }
+
+    // 2. Fallback de alta precisão: busca por botões com texto estrito "Lançar" ou "Catch" fora do container
+    if (!targetButton) {
+      for (var d2 = 0; d2 < docs.length; d2++) {
+        var doc2 = docs[d2];
+        if (!doc2 || !doc2.body) continue;
+
+        var allButtons = Array.from(doc2.querySelectorAll('button, div[role="button"], [class*="catch-btn"], [class*="btn-lancar"]'));
+        var foundBtn = allButtons.find(function(b) {
+          if (b.disabled || b.offsetParent === null) return false;
+          if (b.tagName === 'A' || b.hasAttribute('href')) return false;
+
+          var text = (b.textContent || '').trim().toLowerCase();
+          // Comparação ESTRITA para não pegar links do menu, botões de loja ('pokébola') ou abas ('capturar')
+          return text === 'lançar' || text === 'lancar' || text === 'catch';
+        });
+
+        if (foundBtn) {
+          targetButton = foundBtn;
+          break;
+        }
       }
     }
 
-    // 2. Fallback heurístico: busca por botões com textos de captura
+    // Se NÃO houver botão "Lançar" ativo (ex: entre spawns de Pokémon), NÃO clica em nada!
     if (!targetButton) {
-      const buttons = Array.from(document.querySelectorAll('button, a.btn, div[role="button"]'));
-      targetButton = buttons.find((el) => {
-        if (el.disabled || el.offsetParent === null) return false;
-        const text = (el.textContent || '').trim().toLowerCase();
-        return (
-          text.includes('capturar') ||
-          text.includes('lançar') ||
-          text.includes('lancar') ||
-          text.includes('catch') ||
-          text.includes('pokébola') ||
-          text.includes('pokebola')
-        );
-      }) || null;
+      return { success: false, reason: 'Nenhum Pokémon selvagem para captura ou botão Lançar indisponível' };
     }
 
     // 3. Inspeção e extração estrita de dados REAIS do Pokémon no DOM do jogo
-    let extracted = null;
-
+    var extracted = null;
     try {
-      const nameEl = document.querySelector('.enemy-name, .pokemon-name, .wild-pokemon-name, #enemy-name, .target-name, .pokemon-info .name, .pokemon-card strong');
-      const levelEl = document.querySelector('.enemy-level, .pokemon-level, .level-badge, .wild-level, .pokemon-info .level');
-      const shinyEl = document.querySelector('.shiny-star, .is-shiny, .badge-shiny, .shiny-icon, [data-shiny="true"]');
-      const ballEl = document.querySelector('.active-pokeball, .selected-ball, .ball-slot.active, [data-selected-ball]');
-      const ivEl = document.querySelector('.pokemon-iv, .iv-percentage, .iv-val, [data-iv]');
+      var scopeDoc = targetButton.ownerDocument || document;
+      var nameEl = scopeDoc.querySelector('.enemy-name, .pokemon-name, .wild-pokemon-name, #enemy-name, .target-name, .pokemon-info .name, .pokemon-card strong');
+      var levelEl = scopeDoc.querySelector('.enemy-level, .pokemon-level, .level-badge, .wild-level, .pokemon-info .level');
+      var shinyEl = scopeDoc.querySelector('.shiny-star, .is-shiny, .badge-shiny, .shiny-icon, [data-shiny="true"]');
+      var ballEl = scopeDoc.querySelector('.active-pokeball, .selected-ball, .ball-slot.active, [data-selected-ball]');
+      var ivEl = scopeDoc.querySelector('.pokemon-iv, .iv-percentage, .iv-val, [data-iv]');
 
-      let rawName = nameEl ? (nameEl.textContent || '').trim() : '';
-      let level = 1;
+      var rawName = nameEl ? (nameEl.textContent || '').trim() : '';
+      var level = 1;
 
       // Fallback: busca diretamente no painel de captura adjacente ao botão Lançar
       if (!rawName && targetButton) {
-        const captureBox = targetButton.closest('div, section, [class*="captur"]') || targetButton.parentElement;
+        var captureBox = targetButton.closest('div, section, [class*="captur"]') || targetButton.parentElement;
         if (captureBox) {
-          const cText = captureBox.textContent || '';
-          const match = cText.match(/([A-Za-z0-9À-ÿ\\s\\-]+?)(?:\\s+Lv\\.?\\s*(\\d+))/i);
+          var cText = captureBox.textContent || '';
+          var match = cText.match(/([A-Za-z0-9À-ÿ\\s\\-]+?)(?:\\s+Lv\\.?\\s*(\\d+))/i);
           if (match) {
-            const clean = match[1].replace(/CAPTURA|selvagem|Loja|Lançar|lancar/gi, '').trim();
+            var clean = match[1].replace(/CAPTURA|selvagem|Loja|Lançar|lancar/gi, '').trim();
             if (clean.length >= 2 && clean.length <= 25) {
               rawName = clean;
               if (match[2]) level = parseInt(match[2], 10) || 1;
@@ -95,68 +138,73 @@ export const INJECTION_SCRIPT = `
       }
 
       if (rawName.length > 0) {
-        const cleanName = rawName.replace(/^Lv\\.?\\s*\\d+\\s*/i, '').replace(/^Nv\\.?\\s*\\d+\\s*/i, '').replace(/^\\[\\d+\\]\\s*/i, '').replace(/\\s*\\(Shiny\\)/i, '').trim();
+        var cleanName = rawName.replace(/^Lv\\.?\\s*\\d+\\s*/i, '').replace(/^Nv\\.?\\s*\\d+\\s*/i, '').replace(/^\\[\\d+\\]\\s*/i, '').replace(/\\s*\\(Shiny\\)/i, '').trim();
 
         if (levelEl) {
-          const num = parseInt((levelEl.textContent || '').replace(/\\D/g, ''), 10);
+          var num = parseInt((levelEl.textContent || '').replace(/\\D/g, ''), 10);
           if (!isNaN(num) && num > 0) level = num;
         }
 
-        const isShiny = !!shinyEl || rawName.toLowerCase().includes('shiny') || rawName.includes('✨');
+        var isShiny = Boolean(shinyEl || rawName.toLowerCase().indexOf('shiny') !== -1 || rawName.indexOf('✨') !== -1);
 
-        let pokeball = 'pokeball';
+        var pokeball = 'pokeball';
         if (ballEl) {
-          const ballClass = (ballEl.className + ' ' + (ballEl.getAttribute('data-ball') || '') + ' ' + (ballEl.textContent || '')).toLowerCase();
-          if (ballClass.includes('master')) pokeball = 'masterball';
-          else if (ballClass.includes('ultra')) pokeball = 'ultraball';
-          else if (ballClass.includes('great')) pokeball = 'greatball';
+          var ballClass = ((ballEl.className || '') + ' ' + (ballEl.getAttribute('data-ball') || '') + ' ' + (ballEl.textContent || '')).toLowerCase();
+          if (ballClass.indexOf('master') !== -1) pokeball = 'masterball';
+          else if (ballClass.indexOf('ultra') !== -1) pokeball = 'ultraball';
+          else if (ballClass.indexOf('great') !== -1) pokeball = 'greatball';
         }
 
-        let ivPercentage = undefined;
+        var ivPercentage = undefined;
         if (ivEl) {
-          const ivMatches = (ivEl.textContent || '').match(/(\\d+(\\.\\d+)?)/);
+          var ivMatches = (ivEl.textContent || '').match(/(\\d+(\\.\\d+)?)/);
           if (ivMatches && ivMatches[1]) {
             ivPercentage = parseFloat(ivMatches[1]);
           }
         }
 
-        let quality = 'comum';
-        const cardContainer = (nameEl.closest('.pokemon-card, .enemy-box, .enemy-card, .battle-container') || nameEl.parentElement);
+        var quality = 'comum';
+        var cardContainer = nameEl ? (nameEl.closest('.pokemon-card, .enemy-box, .enemy-card, .battle-container') || nameEl.parentElement) : null;
         if (cardContainer) {
-          const containerClasses = (cardContainer.className + ' ' + (cardContainer.getAttribute('data-quality') || '') + ' ' + (cardContainer.getAttribute('data-rarity') || '')).toLowerCase();
-          if (containerClasses.includes('divina') || containerClasses.includes('divine')) {
+          var containerClasses = ((cardContainer.className || '') + ' ' + (cardContainer.getAttribute('data-quality') || '') + ' ' + (cardContainer.getAttribute('data-rarity') || '')).toLowerCase();
+          if (containerClasses.indexOf('divina') !== -1 || containerClasses.indexOf('divine') !== -1) {
             quality = 'divina';
-          } else if (containerClasses.includes('ancia') || containerClasses.includes('anciã') || containerClasses.includes('ancient')) {
+          } else if (containerClasses.indexOf('ancia') !== -1 || containerClasses.indexOf('anciã') !== -1 || containerClasses.indexOf('ancient') !== -1) {
             quality = 'ancia';
-          } else if (containerClasses.includes('mitica') || containerClasses.includes('mítica') || containerClasses.includes('mythic')) {
+          } else if (containerClasses.indexOf('mitica') !== -1 || containerClasses.indexOf('mítica') !== -1 || containerClasses.indexOf('mythic') !== -1) {
             quality = 'mitica';
-          } else if (containerClasses.includes('lendaria') || containerClasses.includes('lendária') || containerClasses.includes('legendary')) {
+          } else if (containerClasses.indexOf('lendaria') !== -1 || containerClasses.indexOf('lendária') !== -1 || containerClasses.indexOf('legendary') !== -1) {
             quality = 'lendaria';
-          } else if (containerClasses.includes('epica') || containerClasses.includes('épica') || containerClasses.includes('epic')) {
+          } else if (containerClasses.indexOf('epica') !== -1 || containerClasses.indexOf('épica') !== -1 || containerClasses.indexOf('epic') !== -1) {
             quality = 'epica';
-          } else if (containerClasses.includes('rara') || containerClasses.includes('rare')) {
+          } else if (containerClasses.indexOf('rara') !== -1 || containerClasses.indexOf('rare') !== -1) {
             quality = 'rara';
-          } else if (containerClasses.includes('incomum') || containerClasses.includes('uncommon')) {
+          } else if (containerClasses.indexOf('incomum') !== -1 || containerClasses.indexOf('uncommon') !== -1) {
             quality = 'incomum';
-          } else if (containerClasses.includes('fraca') || containerClasses.includes('weak') || containerClasses.includes('poor')) {
+          } else if (containerClasses.indexOf('fraca') !== -1 || containerClasses.indexOf('weak') !== -1 || containerClasses.indexOf('poor') !== -1) {
             quality = 'fraca';
-          } else if (containerClasses.includes('comum') || containerClasses.includes('common')) {
+          } else if (containerClasses.indexOf('comum') !== -1 || containerClasses.indexOf('common') !== -1) {
             quality = 'comum';
           }
         }
 
         extracted = {
           pokemonName: cleanName,
-          level,
-          isShiny,
-          pokeball,
-          quality,
-          ivPercentage,
+          level: level,
+          isShiny: isShiny,
+          pokeball: pokeball,
+          quality: quality,
+          ivPercentage: ivPercentage,
         };
       }
-    } catch (e) {}
+    } catch (_) {}
 
+    // 4. Executa o clique seguro no botão de lançamento
     if (targetButton) {
+      if (targetButton.type === 'submit') {
+        targetButton.type = 'button';
+      }
+
       targetButton.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
       targetButton.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
       targetButton.click();

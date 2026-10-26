@@ -10,6 +10,7 @@ import {
 } from '../services/marketService.js';
 import type { AccountOption } from './familyDepotComponent.js';
 import { Chart } from 'chart.js/auto';
+import { TradeArbitrageComponent } from './tradeArbitrageComponent.js';
 
 export interface MarketAccountConfig {
   id: string;
@@ -30,7 +31,8 @@ export class MarketMonitorComponent {
 
   // Estado da Conta Ativa e Navegação de Abas
   private activeAccountId = 'account_01';
-  private currentMainTab: 'general' | 'my-market' = 'general';
+  private currentMainTab: 'general' | 'my-market' | 'trade-arbitrage' = 'general';
+  private tradeArbitrageComponent!: TradeArbitrageComponent;
 
   // Estado do Mercado Geral
   private currentItem: MarketItemType = 'diamonds';
@@ -81,6 +83,8 @@ export class MarketMonitorComponent {
   private elMyMarketAccountIndicator!: HTMLElement;
   private elGeneralViewContainer!: HTMLElement;
   private elMyViewContainer!: HTMLElement;
+  private elBtnMainTabArbitrage!: HTMLButtonElement;
+  private elArbitrageViewContainer!: HTMLElement;
 
   // Referências DOM - Cabeçalho Geral
   private elItemIndicatorLabel!: HTMLElement;
@@ -296,6 +300,16 @@ export class MarketMonitorComponent {
                 <span class="tab-count-badge" id="my-market-count-badge">0</span>
               </div>
               <span class="tab-btn-sub" id="my-market-account-indicator">Vinculado à Conta 01</span>
+            </div>
+          </button>
+
+          <button class="market-main-tab-btn" id="btn-main-tab-trade-arbitrage" data-tab="trade-arbitrage" role="tab" aria-selected="false">
+            <span class="tab-btn-icon">⚖️</span>
+            <div class="tab-btn-text">
+              <div class="tab-title-row">
+                <span class="tab-btn-title">Arbitragem & Rentabilidade</span>
+              </div>
+              <span class="tab-btn-sub">Dólar vs Diamante • Break-even & Margens</span>
             </div>
           </button>
         </nav>
@@ -635,6 +649,13 @@ export class MarketMonitorComponent {
           </section>
         </div>
 
+        <!-- ==========================================================
+             VISÃO 3: ARBITRAGEM & RENTABILIDADE CRUZADA (DÓLAR VS DIAMANTE)
+             ========================================================== -->
+        <div id="market-trade-arbitrage-container" class="market-tab-content trade-arbitrage-view" style="display: none;">
+          <!-- Instanciado dinamicamente via TradeArbitrageComponent -->
+        </div>
+
       </div>
 
       <!-- ==========================================================
@@ -709,6 +730,14 @@ export class MarketMonitorComponent {
     this.elMyMarketAccountIndicator = this.element.querySelector('#my-market-account-indicator') as HTMLElement;
     this.elGeneralViewContainer = this.element.querySelector('#market-general-view-container') as HTMLElement;
     this.elMyViewContainer = this.element.querySelector('#market-my-view-container') as HTMLElement;
+    this.elBtnMainTabArbitrage = this.element.querySelector('#btn-main-tab-trade-arbitrage') as HTMLButtonElement;
+    this.elArbitrageViewContainer = this.element.querySelector('#market-trade-arbitrage-container') as HTMLElement;
+
+    this.tradeArbitrageComponent = new TradeArbitrageComponent(
+      this.getAccountOptions,
+      this.onToast,
+    );
+    this.elArbitrageViewContainer.appendChild(this.tradeArbitrageComponent.element);
 
     // Switch Master de Permissão de Requisições
     this.elRequestsToggle = this.element.querySelector('#market-requests-master-toggle') as HTMLInputElement;
@@ -822,6 +851,10 @@ export class MarketMonitorComponent {
 
     this.elBtnMainTabMyMarket.addEventListener('click', () => {
       this.switchMainTab('my-market');
+    });
+
+    this.elBtnMainTabArbitrage.addEventListener('click', () => {
+      this.switchMainTab('trade-arbitrage');
     });
 
     // ------------------------------------------
@@ -1092,19 +1125,24 @@ export class MarketMonitorComponent {
       return;
     }
 
+    // Notifica componente de arbitragem comercial
+    this.tradeArbitrageComponent?.setActiveAccount(accountId);
+
     // Dispara a busca de dados correspondente à aba atualmente visível
     if (this.currentMainTab === 'general') {
       this.refreshMarketData(true);
-    } else {
+    } else if (this.currentMainTab === 'my-market') {
       this.refreshMyMarketData(true);
+    } else if (this.currentMainTab === 'trade-arbitrage') {
+      this.tradeArbitrageComponent?.checkMarketPresence();
     }
   }
 
   // ==========================================
-  // NAVEGAÇÃO DE ABAS (MERCADO GERAL VS MEU MERCADO)
+  // NAVEGAÇÃO DE ABAS (MERCADO GERAL VS MEU MERCADO VS ARBITRAGEM)
   // ==========================================
 
-  public switchMainTab(tab: 'general' | 'my-market'): void {
+  public switchMainTab(tab: 'general' | 'my-market' | 'trade-arbitrage'): void {
     if (this.currentMainTab === tab) return;
     this.currentMainTab = tab;
 
@@ -1114,16 +1152,22 @@ export class MarketMonitorComponent {
     this.elBtnMainTabMyMarket.classList.toggle('active', tab === 'my-market');
     this.elBtnMainTabMyMarket.setAttribute('aria-selected', String(tab === 'my-market'));
 
+    this.elBtnMainTabArbitrage.classList.toggle('active', tab === 'trade-arbitrage');
+    this.elBtnMainTabArbitrage.setAttribute('aria-selected', String(tab === 'trade-arbitrage'));
+
+    this.elGeneralViewContainer.style.display = tab === 'general' ? 'block' : 'none';
+    this.elMyViewContainer.style.display = tab === 'my-market' ? 'block' : 'none';
+    this.elArbitrageViewContainer.style.display = tab === 'trade-arbitrage' ? 'block' : 'none';
+
     if (tab === 'general') {
-      this.elGeneralViewContainer.style.display = 'block';
-      this.elMyViewContainer.style.display = 'none';
       if (this.latestListings.length === 0) {
         this.refreshMarketData();
       }
-    } else {
-      this.elGeneralViewContainer.style.display = 'none';
-      this.elMyViewContainer.style.display = 'block';
+    } else if (tab === 'my-market') {
       this.refreshMyMarketData();
+    } else if (tab === 'trade-arbitrage') {
+      this.tradeArbitrageComponent.checkMarketPresence();
+      this.tradeArbitrageComponent.setActiveAccount(this.activeAccountId);
     }
   }
 

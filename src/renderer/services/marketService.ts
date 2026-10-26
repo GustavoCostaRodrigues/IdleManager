@@ -107,12 +107,16 @@ export class MarketService {
   private accountTokens: Record<string, string> = {};
   private accountJwtActive: Record<string, boolean> = {};
   private activeAccountId = 'account_01';
-  private requestsEnabled = true;
+  // Por padrão, TODAS AS REQUISIÇÕES DEVEM INICIAR DESABILITADAS quando o app for aberto.
+  private requestsEnabled = false;
   private myMarketCache: Record<string, MyMarketData> = {};
   private priceHistory: Record<string, MarketPricePoint[]> = {};
   private targetPrices: Record<string, number> = {};
   private tokenListeners = new Set<(accountId: string, token: string | null) => void>();
   private requestsListeners = new Set<(enabled: boolean) => void>();
+  private accountMarketPresence: Record<string, { inMarket: boolean; lastTimestamp: number }> = {};
+  private marketPresenceListeners = new Set<(accountId: string, inMarket: boolean) => void>();
+  private latestDiamondPriceDollars = 4_500_000;
 
   private constructor() {
     this.loadTokensAndActiveAccount();
@@ -158,6 +162,48 @@ export class MarketService {
         console.error('[MarketService] Erro no listener de requisições:', err);
       }
     }
+  }
+
+  // ==========================================
+  // PRESENÇA FÍSICA NO MERCADO (PASSIVA) & COTAÇÃO
+  // ==========================================
+
+  public getLatestDiamondPrice(): number {
+    return this.latestDiamondPriceDollars;
+  }
+
+  public setLatestDiamondPrice(price: number): void {
+    if (price > 0) {
+      this.latestDiamondPriceDollars = Math.round(price);
+    }
+  }
+
+  public setAccountMarketPresence(accountId: string, inMarket: boolean): void {
+    const cleanId = (accountId || 'account_01').trim();
+    this.accountMarketPresence[cleanId] = {
+      inMarket: !!inMarket,
+      lastTimestamp: Date.now(),
+    };
+    for (const listener of this.marketPresenceListeners) {
+      try {
+        listener(cleanId, !!inMarket);
+      } catch (_) {}
+    }
+  }
+
+  public isAccountInMarket(accountId: string, maxAgeMs = 180_000): boolean {
+    const cleanId = (accountId || 'account_01').trim();
+    const entry = this.accountMarketPresence[cleanId];
+    if (!entry) return false;
+    if (!entry.inMarket) return false;
+    return Date.now() - entry.lastTimestamp < maxAgeMs;
+  }
+
+  public onMarketPresenceChange(listener: (accountId: string, inMarket: boolean) => void): () => void {
+    this.marketPresenceListeners.add(listener);
+    return () => {
+      this.marketPresenceListeners.delete(listener);
+    };
   }
 
   // ==========================================
@@ -329,12 +375,8 @@ export class MarketService {
       }
     } catch (_) {}
 
-    try {
-      const savedRequestsEnabled = localStorage.getItem(STORAGE_KEY_REQUESTS_ENABLED);
-      if (savedRequestsEnabled !== null) {
-        this.requestsEnabled = savedRequestsEnabled !== 'false';
-      }
-    } catch (_) {}
+    // Por padrão, TODAS AS REQUISIÇÕES DEVEM INICIAR DESABILITADAS quando o app for aberto.
+    this.requestsEnabled = false;
 
     this.cachedToken = this.accountTokens[this.activeAccountId] || null;
   }
@@ -542,6 +584,13 @@ export class MarketService {
 
     if (metrics.currentMinPrice > 0) {
       this.recordHistoryPoint(itemType, currencyFilter, currentPoint);
+    }
+
+    if (itemType === 'diamonds' && currencyFilter === 'dollars') {
+      const bestPrice = metrics.currentAvgPrice > 0 ? metrics.currentAvgPrice : metrics.currentMinPrice;
+      if (bestPrice > 0) {
+        this.setLatestDiamondPrice(bestPrice);
+      }
     }
 
     const history = this.getHistory(itemType, currencyFilter);

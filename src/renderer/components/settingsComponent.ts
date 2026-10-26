@@ -6,6 +6,7 @@ import type {
 import { AlertSettingsService } from '../services/alertSettingsService.js';
 import { MarketService } from '../services/marketService.js';
 import { HuntClientService } from '../services/huntClientService.js';
+import { CaptureStore } from '../services/captureStore.js';
 
 interface QualityMeta {
   key: PokemonQuality;
@@ -32,6 +33,10 @@ export class SettingsComponent {
   private readonly alertService: AlertSettingsService;
   private readonly marketService: MarketService;
   private readonly huntService: HuntClientService;
+  private readonly captureStore: CaptureStore;
+
+  // Tab State (Segmented Control)
+  private activeTabId: string = 'tab-requests';
 
   // DOM Elements - Cabeçalho & Ações
   private btnSaveTop!: HTMLButtonElement;
@@ -45,6 +50,8 @@ export class SettingsComponent {
   private statusScreenHunt!: HTMLElement;
   private toggleScreenMarket!: HTMLInputElement;
   private statusScreenMarket!: HTMLElement;
+  private toggleScreenCaptures!: HTMLInputElement;
+  private statusScreenCaptures!: HTMLElement;
 
   // DOM Elements - Sessão
   private inputClickInterval!: HTMLInputElement;
@@ -53,6 +60,7 @@ export class SettingsComponent {
   // Cleanup de listeners
   private unsubscribeTokenChange: (() => void) | null = null;
   private unsubscribeMarketRequests: (() => void) | null = null;
+  private unsubscribeCapturesRequests: (() => void) | null = null;
 
   constructor(
     private readonly onApplyInterval?: (intervalMs: number) => void,
@@ -63,6 +71,7 @@ export class SettingsComponent {
     this.alertService = AlertSettingsService.getInstance();
     this.marketService = MarketService.getInstance();
     this.huntService = HuntClientService.getInstance();
+    this.captureStore = CaptureStore.getInstance();
 
     this.element = document.createElement('div');
     this.element.className = 'settings-container';
@@ -86,26 +95,11 @@ export class SettingsComponent {
             </svg>
             <span>CENTRAL DE AJUSTES & GOVERNANÇA</span>
           </div>
-          <h1 class="settings-title">Ajustes, Governança de Requisições & Tokens</h1>
-          <p class="settings-subtitle">Controle centralizado: gerencie quais telas e contas disparam requisições de rede, configure os tokens JWT e defina critérios de alerta para capturas.</p>
+          <h1 class="settings-title">Ajustes & Configurações</h1>
+          <p class="settings-subtitle">Gerencie permissões de rede, autenticação JWT, critérios de notificação para capturas e parâmetros globais do Poke Idle Manager.</p>
         </div>
 
         <div class="settings-header-actions">
-          <button id="btn-test-alert" class="btn-settings-action btn-test" title="Dispara uma simulação do alerta pulsante no menu lateral">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
-            </svg>
-            <span>Testar Alerta Pulsante</span>
-          </button>
-
-          <button id="btn-reset-defaults" class="btn-settings-action btn-reset" title="Restaura os valores padrões de alerta recomendados">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
-              <path d="M3 3v5h5"/>
-            </svg>
-            <span>Restaurar Padrões</span>
-          </button>
-
           <button id="btn-save-settings-top" class="btn-settings-action btn-save-primary" title="Salva todas as alterações imediatamente">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
@@ -117,177 +111,231 @@ export class SettingsComponent {
         </div>
       </header>
 
-      <!-- CONTEÚDO PRINCIPAL DOS AJUSTES -->
-      <div class="settings-content-body">
+      <!-- CARD GERAL COM SEGMENTED CONTROL -->
+      <div class="settings-main-card">
+        <!-- SEGMENTED CONTROL NO TOPO DO CARD GERAL -->
+        <nav class="settings-segmented-nav" aria-label="Abas de Ajustes">
+          <div class="settings-segmented-control" role="tablist">
+            <button class="segmented-tab active" data-tab="tab-requests" role="tab" id="tab-btn-requests" aria-selected="true" aria-controls="tab-pane-requests" title="Controle de requisições por tela">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="2" y1="12" x2="22" y2="12"/>
+                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+              </svg>
+              <span class="tab-label">Requisições de Rede</span>
+            </button>
 
-        <!-- ======================================================== -->
-        <!-- CARD 1: CONTROLE DE REQUISIÇÕES POR TELA (HTTP)         -->
-        <!-- ======================================================== -->
-        <section class="settings-card">
-          <div class="settings-card-header">
-            <div class="settings-card-header-info">
-              <div class="settings-card-icon network-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <circle cx="12" cy="12" r="10"/>
-                  <line x1="2" y1="12" x2="22" y2="12"/>
-                  <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
-                </svg>
+            <button class="segmented-tab" data-tab="tab-accounts" role="tab" id="tab-btn-accounts" aria-selected="false" aria-controls="tab-pane-accounts" title="Gerenciamento de contas e tokens JWT">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+              </svg>
+              <span class="tab-label">Contas & Tokens JWT</span>
+            </button>
+
+            <button class="segmented-tab" data-tab="tab-alerts" role="tab" id="tab-btn-alerts" aria-selected="false" aria-controls="tab-pane-alerts" title="Critérios de notificação pulsante">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <path d="M12 2a10 10 0 0 1 10 10"/>
+                <circle cx="12" cy="12" r="3"/>
+              </svg>
+              <span class="tab-label">Alertas de Captura</span>
+            </button>
+
+            <button class="segmented-tab" data-tab="tab-system" role="tab" id="tab-btn-system" aria-selected="false" aria-controls="tab-pane-system" title="Parâmetros de sessão e auto-click">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+                <line x1="8" y1="21" x2="16" y2="21"/>
+                <line x1="12" y1="17" x2="12" y2="21"/>
+              </svg>
+              <span class="tab-label">Sessão & Sistema</span>
+            </button>
+          </div>
+        </nav>
+
+        <!-- CORPO DO CARD GERAL COM OS PAINÉIS DE CADA ABA -->
+        <div class="settings-tab-content">
+          <!-- ABA 1: REQUISIÇÕES POR TELA -->
+          <div class="settings-tab-pane active" id="tab-pane-requests" role="tabpanel" aria-labelledby="tab-btn-requests">
+            <div class="tab-pane-header">
+              <div class="tab-pane-header-info">
+                <div class="settings-card-icon network-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="2" y1="12" x2="22" y2="12"/>
+                    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                  </svg>
+                </div>
+                <div>
+                  <h2 class="tab-pane-title">Controle de Requisições por Tela (HTTP & Background)</h2>
+                  <p class="tab-pane-desc">Ative ou pause as requisições de rede feitas pela aplicação. Ao pausar uma tela, nenhuma chamada HTTP será disparada em direção à API oficial do jogo.</p>
+                </div>
               </div>
-              <div>
-                <h2 class="settings-card-title">Controle de Requisições por Tela (HTTP & Background)</h2>
-                <p class="settings-card-desc">Ative ou pause as requisições de rede feitas pela aplicação. Ao pausar uma tela, nenhuma chamada HTTP será disparada em direção à API oficial do jogo.</p>
+            </div>
+
+            <div class="settings-screens-grid">
+              <!-- 1. DASHBOARD DA HUNT -->
+              <div class="settings-screen-card" id="card-screen-hunt">
+                <div class="screen-card-header">
+                  <div class="screen-card-info">
+                    <div class="screen-icon hunt-screen-icon">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"/>
+                        <circle cx="12" cy="12" r="6"/>
+                        <circle cx="12" cy="12" r="2"/>
+                      </svg>
+                    </div>
+                    <div>
+                      <h3 class="screen-name">Dashboard da Hunt</h3>
+                      <span class="screen-route">Rota: <code>/api/game/depot</code></span>
+                    </div>
+                  </div>
+                  <label class="switch-toggle" title="Ativar ou pausar requisições em background do Dashboard da Hunt">
+                    <input type="checkbox" id="toggle-screen-hunt" />
+                    <span class="switch-slider"></span>
+                  </label>
+                </div>
+                <p class="screen-desc">
+                  Sincroniza inventário e depósito oficial de itens com intervalos randômicos e desincronizados (jitter de 60 a 90s) para contabilizar lucros e drops em dólares.
+                </p>
+                <div class="screen-status-row">
+                  <span class="screen-status-badge status-paused" id="status-screen-hunt">
+                    <span class="status-dot red"></span>
+                    <span>Requisições Pausadas</span>
+                  </span>
+                </div>
+              </div>
+
+              <!-- 2. MONITOR DE MERCADO -->
+              <div class="settings-screen-card" id="card-screen-market">
+                <div class="screen-card-header">
+                  <div class="screen-card-info">
+                    <div class="screen-icon market-screen-icon">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="12" y1="1" x2="12" y2="23"/>
+                        <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                      </svg>
+                    </div>
+                    <div>
+                      <h3 class="screen-name">Monitor de Mercado</h3>
+                      <span class="screen-route">Rota: <code>/api/game/market</code></span>
+                    </div>
+                  </div>
+                  <label class="switch-toggle" title="Ativar ou pausar requisições do Monitor de Mercado">
+                    <input type="checkbox" id="toggle-screen-market" />
+                    <span class="switch-slider"></span>
+                  </label>
+                </div>
+                <p class="screen-desc">
+                  Consulta cotações e ofertas ativas de Diamonds e Itens no mercado global do jogo, além de verificar os anúncios e pedidos da conta selecionada.
+                </p>
+                <div class="screen-status-row">
+                  <span class="screen-status-badge status-paused" id="status-screen-market">
+                    <span class="status-dot red"></span>
+                    <span>Requisições Pausadas</span>
+                  </span>
+                </div>
+              </div>
+
+              <!-- 3. DASHBOARD DE CAPTURAS -->
+              <div class="settings-screen-card" id="card-screen-captures">
+                <div class="screen-card-header">
+                  <div class="screen-card-info">
+                    <div class="screen-icon capture-screen-icon">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="9"/>
+                        <circle cx="12" cy="12" r="3"/>
+                        <path d="M3 12h6m6 0h6"/>
+                      </svg>
+                    </div>
+                    <div>
+                      <h3 class="screen-name">Dashboard de Capturas</h3>
+                      <span class="screen-route">Rota: <code>/api/game/capture-log</code></span>
+                    </div>
+                  </div>
+                  <label class="switch-toggle" title="Ativar ou pausar requisições do Dashboard de Capturas">
+                    <input type="checkbox" id="toggle-screen-captures" />
+                    <span class="switch-slider"></span>
+                  </label>
+                </div>
+                <p class="screen-desc">
+                  Consulta o histórico oficial de capturas na API do jogo com IVs exatos (0 a 192), multiplicadores de qualidade e itens reais de cada captura confirmada.
+                </p>
+                <div class="screen-status-row">
+                  <span class="screen-status-badge status-paused" id="status-screen-captures">
+                    <span class="status-dot red"></span>
+                    <span>Requisições Pausadas</span>
+                  </span>
+                </div>
               </div>
             </div>
           </div>
 
-          <div class="settings-screens-grid">
-            <!-- 1. DASHBOARD DA HUNT -->
-            <div class="settings-screen-card" id="card-screen-hunt">
-              <div class="screen-card-header">
-                <div class="screen-card-info">
-                  <div class="screen-icon hunt-screen-icon">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <circle cx="12" cy="12" r="10"/>
-                      <circle cx="12" cy="12" r="6"/>
-                      <circle cx="12" cy="12" r="2"/>
-                    </svg>
-                  </div>
-                  <div>
-                    <h3 class="screen-name">Dashboard da Hunt</h3>
-                    <span class="screen-route">Rota: <code>/api/game/depot</code></span>
-                  </div>
-                </div>
-                <label class="switch-toggle" title="Ativar ou pausar requisições em background do Dashboard da Hunt">
-                  <input type="checkbox" id="toggle-screen-hunt" checked />
-                  <span class="switch-slider"></span>
-                </label>
-              </div>
-              <p class="screen-desc">
-                Sincroniza inventário e depósito oficial de itens com intervalos randômicos e desincronizados (jitter de 60 a 90s) para contabilizar lucros e drops em dólares.
-              </p>
-              <div class="screen-status-row">
-                <span class="screen-status-badge status-active" id="status-screen-hunt">
-                  <span class="status-dot green"></span>
-                  <span>Requisições Ativas</span>
-                </span>
-              </div>
-            </div>
-
-            <!-- 2. MONITOR DE MERCADO -->
-            <div class="settings-screen-card" id="card-screen-market">
-              <div class="screen-card-header">
-                <div class="screen-card-info">
-                  <div class="screen-icon market-screen-icon">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <line x1="12" y1="1" x2="12" y2="23"/>
-                      <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
-                    </svg>
-                  </div>
-                  <div>
-                    <h3 class="screen-name">Monitor de Mercado</h3>
-                    <span class="screen-route">Rota: <code>/api/game/market</code></span>
-                  </div>
-                </div>
-                <label class="switch-toggle" title="Ativar ou pausar requisições do Monitor de Mercado">
-                  <input type="checkbox" id="toggle-screen-market" checked />
-                  <span class="switch-slider"></span>
-                </label>
-              </div>
-              <p class="screen-desc">
-                Consulta cotações e ofertas ativas de Diamonds e Itens no mercado global do jogo, além de verificar os anúncios e pedidos da conta selecionada.
-              </p>
-              <div class="screen-status-row">
-                <span class="screen-status-badge status-active" id="status-screen-market">
-                  <span class="status-dot green"></span>
-                  <span>Requisições Ativas</span>
-                </span>
-              </div>
-            </div>
-
-            <!-- 3. DASHBOARD DE CAPTURAS -->
-            <div class="settings-screen-card screen-card-safe" id="card-screen-captures">
-              <div class="screen-card-header">
-                <div class="screen-card-info">
-                  <div class="screen-icon capture-screen-icon">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                    </svg>
-                  </div>
-                  <div>
-                    <h3 class="screen-name">Dashboard de Capturas</h3>
-                    <span class="screen-route">Modo: <code>WebSocket Nativo (Passivo)</code></span>
-                  </div>
-                </div>
-                <div class="screen-badge-locked" title="Esta tela é 100% blindada e passiva. Não gera requisições HTTP na API.">
-                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5">
+          <!-- ABA 2: CONTAS & TOKENS JWT -->
+          <div class="settings-tab-pane" id="tab-pane-accounts" role="tabpanel" aria-labelledby="tab-btn-accounts">
+            <div class="tab-pane-header">
+              <div class="tab-pane-header-info">
+                <div class="settings-card-icon jwt-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
                     <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
                   </svg>
-                  <span>100% Blindado</span>
+                </div>
+                <div>
+                  <h2 class="tab-pane-title">Gerenciamento de Contas & Tokens JWT</h2>
+                  <p class="tab-pane-desc">Controle individual de autenticação das 4 contas. Defina quais JWTs ficam ativos, habilite/pause requisições individuais e insira, altere ou remova tokens.</p>
                 </div>
               </div>
-              <p class="screen-desc">
-                Operação 100% segura contra anti-cheat. Os dados de captura são lidos diretamente do WebSocket nativo que o jogo já envia à tela. Zero requisições HTTP adicionais.
-              </p>
-              <div class="screen-status-row">
-                <span class="screen-status-badge status-safe">
-                  <span class="status-dot blue"></span>
-                  <span>Passivo & Invisível (Sem Requisições HTTP)</span>
-                </span>
-              </div>
-            </div>
-          </div>
-        </section>
 
-        <!-- ======================================================== -->
-        <!-- CARD 2: GESTÃO CENTRAL DE CONTAS & TOKENS JWT           -->
-        <!-- ======================================================== -->
-        <section class="settings-card">
-          <div class="settings-card-header">
-            <div class="settings-card-header-info">
-              <div class="settings-card-icon jwt-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                  <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-                </svg>
-              </div>
-              <div>
-                <h2 class="settings-card-title">Gerenciamento de Contas & Tokens JWT</h2>
-                <p class="settings-card-desc">Controle individual de autenticação das 4 contas. Defina quais JWTs ficam ativos, habilite/pause requisições individuais e insira, altere ou remova tokens.</p>
+              <div class="tab-pane-actions">
+                <button id="btn-detect-all-tokens" class="btn-settings-action btn-detect-all" title="Varre os WebViews ativos no Grid e detecta automaticamente os tokens de login">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+                  </svg>
+                  <span>Auto-Detectar dos WebViews</span>
+                </button>
               </div>
             </div>
 
-            <button id="btn-detect-all-tokens" class="btn-settings-action btn-detect-all" title="Varre os WebViews ativos no Grid e detecta automaticamente os tokens de login">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
-              </svg>
-              <span>Auto-Detectar dos WebViews</span>
-            </button>
+            <!-- GRID DAS 4 CONTAS -->
+            <div class="settings-accounts-jwt-grid" id="accounts-jwt-grid">
+              ${this.renderAccountJwtCardsHtml()}
+            </div>
           </div>
 
-          <!-- GRID DAS 4 CONTAS -->
-          <div class="settings-accounts-jwt-grid" id="accounts-jwt-grid">
-            ${this.renderAccountJwtCardsHtml()}
-          </div>
-        </section>
-
-        <!-- ======================================================== -->
-        <!-- CARD 3: NOTIFICAÇÃO PULSANTE DO DASHBOARD DE CAPTURAS   -->
-        <!-- ======================================================== -->
-        <section class="settings-card">
-          <div class="settings-card-header">
-            <div class="settings-card-header-info">
-              <div class="settings-card-icon pulse-preview-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <circle cx="12" cy="12" r="10"/>
-                  <path d="M12 2a10 10 0 0 1 10 10"/>
-                  <circle cx="12" cy="12" r="3"/>
-                </svg>
-                <span class="preview-ping-dot"></span>
+          <!-- ABA 3: ALERTAS DE CAPTURA -->
+          <div class="settings-tab-pane" id="tab-pane-alerts" role="tabpanel" aria-labelledby="tab-btn-alerts">
+            <div class="tab-pane-header">
+              <div class="tab-pane-header-info">
+                <div class="settings-card-icon pulse-preview-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/>
+                    <path d="M12 2a10 10 0 0 1 10 10"/>
+                    <circle cx="12" cy="12" r="3"/>
+                  </svg>
+                  <span class="preview-ping-dot"></span>
+                </div>
+                <div>
+                  <h2 class="tab-pane-title">Critérios de Notificação Pulsante (Menu Lateral)</h2>
+                  <p class="tab-pane-desc">Quando qualquer uma das contas capturar um Pokémon que atenda a estes requisitos de qualidade e IV, o botão de Capturas no menu lateral começará a pulsar.</p>
+                </div>
               </div>
-              <div>
-                <h2 class="settings-card-title">Critérios de Notificação Pulsante (Menu Lateral)</h2>
-                <p class="settings-card-desc">Quando qualquer uma das contas capturar um Pokémon que atenda a estes requisitos de qualidade e IV, o botão de Capturas no menu lateral começará a pulsar.</p>
+
+              <div class="tab-pane-actions">
+                <button id="btn-test-alert" class="btn-settings-action btn-test" title="Dispara uma simulação do alerta pulsante no menu lateral">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+                  </svg>
+                  <span>Testar Alerta Pulsante</span>
+                </button>
+
+                <button id="btn-reset-defaults" class="btn-settings-action btn-reset" title="Restaura os valores padrões de alerta recomendados">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                    <path d="M3 3v5h5"/>
+                  </svg>
+                  <span>Restaurar Padrões</span>
+                </button>
               </div>
             </div>
 
@@ -298,94 +346,91 @@ export class SettingsComponent {
               <button class="preset-btn" id="preset-iv150" title="Ativa todas as qualidades exigindo IV 150+">Qualquer IV 150+</button>
               <button class="preset-btn" id="preset-all" title="Ativa todas as qualidades para alertar qualquer captura">Todas as Capturas</button>
             </div>
-          </div>
 
-          <!-- TABELA RESPONSIVA DE QUALIDADES E IVS -->
-          <div class="settings-qualities-table-wrapper">
-            <table class="settings-qualities-table">
-              <thead>
-                <tr>
-                  <th style="width: 130px;">Notificação</th>
-                  <th style="width: 170px;">Qualidade</th>
-                  <th style="width: 220px;">Classificação do Jogo</th>
-                  <th style="width: 220px;">IV Mínimo para Alerta</th>
-                  <th>Comportamento do Alerta</th>
-                </tr>
-              </thead>
-              <tbody id="settings-qualities-tbody">
-                ${this.renderQualityRows()}
-              </tbody>
-            </table>
-          </div>
-        </section>
-
-        <!-- ======================================================== -->
-        <!-- CARD 4: PARÂMETROS GERAIS DO JOGO E SESSÃO               -->
-        <!-- ======================================================== -->
-        <section class="settings-card">
-          <div class="settings-card-header">
-            <div class="settings-card-header-info">
-              <div class="settings-card-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
-                  <line x1="8" y1="21" x2="16" y2="21"/>
-                  <line x1="12" y1="17" x2="12" y2="21"/>
-                </svg>
-              </div>
-              <div>
-                <h2 class="settings-card-title">Parâmetros de Sessão & Automação</h2>
-                <p class="settings-card-desc">Configurações globais de conexão e intervalos das contas isoladas.</p>
-              </div>
+            <!-- TABELA RESPONSIVA DE QUALIDADES E IVS -->
+            <div class="settings-qualities-table-wrapper">
+              <table class="settings-qualities-table">
+                <thead>
+                  <tr>
+                    <th style="width: 130px;">Notificação</th>
+                    <th style="width: 170px;">Qualidade</th>
+                    <th style="width: 220px;">Classificação do Jogo</th>
+                    <th style="width: 220px;">IV Mínimo para Alerta</th>
+                    <th>Comportamento do Alerta</th>
+                  </tr>
+                </thead>
+                <tbody id="settings-qualities-tbody">
+                  ${this.renderQualityRows()}
+                </tbody>
+              </table>
             </div>
           </div>
 
-          <div class="settings-form-grid">
-            <div class="settings-form-field">
-              <label class="settings-field-label" for="input-game-url">URL Padrão do Poke Idle World</label>
-              <input type="text" id="input-game-url" class="settings-field-input" value="https://poke.idleworld.online/">
-              <span class="settings-field-help">Endereço acessado pelos webviews particionados das 4 contas.</span>
-            </div>
-
-            <div class="settings-form-field">
-              <label class="settings-field-label" for="input-click-interval">Intervalo do Auto-Click (milissegundos)</label>
-              <div class="settings-input-group">
-                <input type="number" id="input-click-interval" class="settings-field-input" min="500" max="10000" step="100" value="1500">
-                <span class="settings-input-suffix">ms</span>
+          <!-- ABA 4: SESSÃO & SISTEMA -->
+          <div class="settings-tab-pane" id="tab-pane-system" role="tabpanel" aria-labelledby="tab-btn-system">
+            <div class="tab-pane-header">
+              <div class="tab-pane-header-info">
+                <div class="settings-card-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+                    <line x1="8" y1="21" x2="16" y2="21"/>
+                    <line x1="12" y1="17" x2="12" y2="21"/>
+                  </svg>
+                </div>
+                <div>
+                  <h2 class="tab-pane-title">Parâmetros de Sessão & Automação</h2>
+                  <p class="tab-pane-desc">Configurações globais de conexão e intervalos das contas isoladas.</p>
+                </div>
               </div>
-              <span class="settings-field-help">Frequência da varredura de auto-click por conta (Padrão: 1500ms).</span>
+            </div>
+
+            <div class="settings-form-grid">
+              <div class="settings-form-field">
+                <label class="settings-field-label" for="input-game-url">URL Padrão do Poke Idle World</label>
+                <input type="text" id="input-game-url" class="settings-field-input" value="https://poke.idleworld.online/">
+                <span class="settings-field-help">Endereço acessado pelos webviews particionados das 4 contas.</span>
+              </div>
+
+              <div class="settings-form-field">
+                <label class="settings-field-label" for="input-click-interval">Intervalo do Auto-Click (milissegundos)</label>
+                <div class="settings-input-group">
+                  <input type="number" id="input-click-interval" class="settings-field-input" min="500" max="10000" step="100" value="1500">
+                  <span class="settings-input-suffix">ms</span>
+                </div>
+                <span class="settings-field-help">Frequência da varredura de auto-click por conta (Padrão: 1500ms).</span>
+              </div>
+            </div>
+
+            <!-- PARTIÇÕES ISOLADAS -->
+            <div class="settings-partition-info">
+              <div class="partition-pill"><span>Conta 01:</span> <code>persist:account_01</code></div>
+              <div class="partition-pill"><span>Conta 02:</span> <code>persist:account_02</code></div>
+              <div class="partition-pill"><span>Conta 03:</span> <code>persist:account_03</code></div>
+              <div class="partition-pill"><span>Conta 04:</span> <code>persist:account_04</code></div>
             </div>
           </div>
-
-          <!-- PARTIÇÕES ISOLADAS -->
-          <div class="settings-partition-info">
-            <div class="partition-pill"><span>Conta 01:</span> <code>persist:account_01</code></div>
-            <div class="partition-pill"><span>Conta 02:</span> <code>persist:account_02</code></div>
-            <div class="partition-pill"><span>Conta 03:</span> <code>persist:account_03</code></div>
-            <div class="partition-pill"><span>Conta 04:</span> <code>persist:account_04</code></div>
-          </div>
-        </section>
-
-      </div>
-
-      <!-- BARRA FLUTUANTE INFERIOR DE SALVAMENTO -->
-      <footer class="settings-footer-bar">
-        <div class="footer-info">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-          </svg>
-          <span>As configurações de requisições, tokens JWT e regras de alerta são salvas localmente e sincronizadas em tempo real.</span>
         </div>
-        <div class="footer-buttons">
-          <button id="btn-save-settings-bottom" class="btn-settings-action btn-save-primary">
+
+        <!-- RODAPÉ DO CARD GERAL -->
+        <footer class="settings-card-footer">
+          <div class="footer-info">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
-              <polyline points="17 21 17 13 7 13 7 21"/>
-              <polyline points="7 3 7 8 15 8"/>
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
             </svg>
-            <span>Salvar Ajustes</span>
-          </button>
-        </div>
-      </footer>
+            <span>As configurações de requisições, tokens JWT e regras de alerta são salvas localmente e sincronizadas em tempo real.</span>
+          </div>
+          <div class="footer-buttons">
+            <button id="btn-save-settings-bottom" class="btn-settings-action btn-save-primary">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                <polyline points="17 21 17 13 7 13 7 21"/>
+                <polyline points="7 3 7 8 15 8"/>
+              </svg>
+              <span>Salvar Ajustes</span>
+            </button>
+          </div>
+        </footer>
+      </div>
     `;
   }
 
@@ -422,7 +467,7 @@ export class SettingsComponent {
                 <span class="switch-hint">Usar token em requisições</span>
               </div>
               <label class="switch-toggle">
-                <input type="checkbox" id="toggle-jwt-active-${acc.id}" class="toggle-jwt-active" data-account-id="${acc.id}" checked />
+                <input type="checkbox" id="toggle-jwt-active-${acc.id}" class="toggle-jwt-active" data-account-id="${acc.id}" />
                 <span class="switch-slider"></span>
               </label>
             </div>
@@ -434,7 +479,7 @@ export class SettingsComponent {
                 <span class="switch-hint">Permitir chamadas de rede</span>
               </div>
               <label class="switch-toggle">
-                <input type="checkbox" id="toggle-acc-reqs-${acc.id}" class="toggle-acc-reqs" data-account-id="${acc.id}" checked />
+                <input type="checkbox" id="toggle-acc-reqs-${acc.id}" class="toggle-acc-reqs" data-account-id="${acc.id}" />
                 <span class="switch-slider"></span>
               </label>
             </div>
@@ -555,6 +600,8 @@ export class SettingsComponent {
     this.statusScreenHunt = this.element.querySelector('#status-screen-hunt') as HTMLElement;
     this.toggleScreenMarket = this.element.querySelector('#toggle-screen-market') as HTMLInputElement;
     this.statusScreenMarket = this.element.querySelector('#status-screen-market') as HTMLElement;
+    this.toggleScreenCaptures = this.element.querySelector('#toggle-screen-captures') as HTMLInputElement;
+    this.statusScreenCaptures = this.element.querySelector('#status-screen-captures') as HTMLElement;
 
     this.inputClickInterval = this.element.querySelector('#input-click-interval') as HTMLInputElement;
     this.inputGameUrl = this.element.querySelector('#input-game-url') as HTMLInputElement;
@@ -583,6 +630,9 @@ export class SettingsComponent {
     }
     if (this.toggleScreenMarket) {
       this.toggleScreenMarket.checked = this.marketService.isRequestsEnabled();
+    }
+    if (this.toggleScreenCaptures) {
+      this.toggleScreenCaptures.checked = this.captureStore.isRequestsEnabled();
     }
     this.updateScreenVisualState();
 
@@ -615,6 +665,17 @@ export class SettingsComponent {
       } else {
         this.statusScreenMarket.className = 'screen-status-badge status-paused';
         this.statusScreenMarket.innerHTML = `<span class="status-dot red"></span><span>Requisições Pausadas</span>`;
+      }
+    }
+
+    const isCapturesEnabled = this.captureStore.isRequestsEnabled();
+    if (this.statusScreenCaptures) {
+      if (isCapturesEnabled) {
+        this.statusScreenCaptures.className = 'screen-status-badge status-active';
+        this.statusScreenCaptures.innerHTML = `<span class="status-dot green"></span><span>Requisições Ativas</span>`;
+      } else {
+        this.statusScreenCaptures.className = 'screen-status-badge status-paused';
+        this.statusScreenCaptures.innerHTML = `<span class="status-dot red"></span><span>Requisições Pausadas</span>`;
       }
     }
   }
@@ -712,7 +773,37 @@ export class SettingsComponent {
     }
   }
 
+  public switchTab(tabId: string): void {
+    this.activeTabId = tabId;
+    const tabButtons = this.element.querySelectorAll<HTMLButtonElement>('.segmented-tab');
+    const tabPanes = this.element.querySelectorAll<HTMLElement>('.settings-tab-pane');
+
+    tabButtons.forEach((btn) => {
+      const isTarget = btn.getAttribute('data-tab') === tabId;
+      btn.classList.toggle('active', isTarget);
+      btn.setAttribute('aria-selected', isTarget ? 'true' : 'false');
+    });
+
+    tabPanes.forEach((pane) => {
+      const isTarget = pane.id === `tab-pane-${tabId.replace('tab-', '')}`;
+      pane.classList.toggle('active', isTarget);
+    });
+  }
+
   private initEvents(): void {
+    // -------------------------------------------------------------
+    // 0. NAVEGAÇÃO POR ABAS (SEGMENTED CONTROL)
+    // -------------------------------------------------------------
+    const tabButtons = this.element.querySelectorAll<HTMLButtonElement>('.segmented-tab');
+    tabButtons.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const tabId = btn.getAttribute('data-tab');
+        if (tabId) {
+          this.switchTab(tabId);
+        }
+      });
+    });
+
     // -------------------------------------------------------------
     // 1. EVENTOS DOS CONTROLES DE TELAS
     // -------------------------------------------------------------
@@ -720,6 +811,9 @@ export class SettingsComponent {
       const enabled = this.toggleScreenHunt.checked;
       this.huntService.setScreenRequestsEnabled(enabled);
       this.updateScreenVisualState();
+      for (const acc of DEFAULT_ACCOUNTS) {
+        this.updateAccountVisualState(acc.id);
+      }
       this.onShowToast?.(
         enabled ? 'Requisições do Dashboard da Hunt ativadas!' : 'Requisições do Dashboard da Hunt pausadas!',
         enabled ? 'success' : 'info',
@@ -732,6 +826,16 @@ export class SettingsComponent {
       this.updateScreenVisualState();
       this.onShowToast?.(
         enabled ? 'Requisições do Monitor de Mercado ativadas!' : 'Requisições do Monitor de Mercado pausadas!',
+        enabled ? 'success' : 'info',
+      );
+    });
+
+    this.toggleScreenCaptures?.addEventListener('change', () => {
+      const enabled = this.toggleScreenCaptures.checked;
+      this.captureStore.setRequestsEnabled(enabled);
+      this.updateScreenVisualState();
+      this.onShowToast?.(
+        enabled ? 'Requisições do Dashboard de Capturas ativadas!' : 'Requisições do Dashboard de Capturas pausadas!',
         enabled ? 'success' : 'info',
       );
     });
@@ -958,6 +1062,13 @@ export class SettingsComponent {
       }
       this.updateScreenVisualState();
     });
+
+    this.unsubscribeCapturesRequests = this.captureStore.onRequestsEnabledChange(() => {
+      if (this.toggleScreenCaptures) {
+        this.toggleScreenCaptures.checked = this.captureStore.isRequestsEnabled();
+      }
+      this.updateScreenVisualState();
+    });
   }
 
   private getSanitizedIv(val: string | undefined): number {
@@ -989,5 +1100,6 @@ export class SettingsComponent {
   public destroy(): void {
     this.unsubscribeTokenChange?.();
     this.unsubscribeMarketRequests?.();
+    this.unsubscribeCapturesRequests?.();
   }
 }
