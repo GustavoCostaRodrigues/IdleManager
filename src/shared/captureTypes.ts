@@ -84,3 +84,47 @@ export const DEFAULT_CAPTURE_ALERT_SETTINGS: CaptureAlertSettings = {
   fraca: { enabled: false, minIv: 180 },
 };
 
+export function normalizePokeball(rawName: string | undefined | null): PokeballType {
+  if (!rawName) return 'pokeball';
+  const clean = String(rawName).toLowerCase().replace(/[^a-z0-9]/g, '');
+  if (clean.includes('ultra')) return 'ultraball';
+  if (clean.includes('super')) return 'superball';
+  if (clean.includes('great')) return 'greatball';
+  if (clean.includes('master')) return 'masterball';
+  if (clean.includes('golden')) return 'golden_idleball';
+  if (clean.includes('rubber')) return 'rubber_ball';
+  if (clean.includes('earth')) return 'earth_ball';
+  if (clean.includes('idle')) return 'idleball';
+  return 'pokeball';
+}
+
+export function qualityFromNumberOrString(q: any): PokemonQuality {
+  if (q === undefined || q === null) return 'comum';
+  if (typeof q === 'string') {
+    const lower = q.toLowerCase();
+    if (lower.includes('divin')) return 'divina';
+    if (lower.includes('anci')) return 'ancia';
+    if (lower.includes('mitic') || lower.includes('mític')) return 'mitica';
+    if (lower.includes('lendar') || lower.includes('lendár')) return 'lendaria';
+    if (lower.includes('epic') || lower.includes('épic')) return 'epica';
+    if (lower.includes('rar')) return 'rara';
+    if (lower.includes('incom')) return 'incomum';
+    if (lower.includes('comum')) return 'comum';
+    if (lower.includes('frac')) return 'fraca';
+    const num = parseFloat(q.replace(/[^0-9.]/g, ''));
+    if (!isNaN(num)) q = num;
+  }
+  if (typeof q === 'number') {
+    if (q >= 4.0) return 'divina';
+    if (q >= 3.0) return 'ancia';
+    if (q >= 2.0) return 'mitica';
+    if (q >= 1.7) return 'lendaria';
+    if (q >= 1.4) return 'epica';
+    if (q >= 1.2) return 'rara';
+    if (q >= 1.05) return 'incomum';
+    if (q >= 0.95) return 'comum';
+    return 'fraca';
+  }
+  return 'comum';
+}
+

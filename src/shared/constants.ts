@@ -56,7 +56,6 @@ export const AUTO_CLICK_CONFIG = {
     '[data-action="catch"]',
     '[data-action="lancar"]',
     'button.action-btn.catch',
-    'button.pokeball-btn',
     '.battle-action-catch',
   ],
 } as const;

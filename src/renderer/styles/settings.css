@@ -149,7 +149,193 @@
 }
 
 /* ==========================================================
-   CARDS DE SEÇÃO
+   CARD GERAL & SEGMENTED CONTROL (ABAS)
+   ========================================================== */
+
+.settings-main-card {
+  background-color: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(12px);
+  margin-bottom: 24px;
+}
+
+/* Barra de Navegação do Segmented Control */
+.settings-segmented-nav {
+  padding: 12px 20px;
+  background: rgba(13, 17, 23, 0.7);
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.settings-segmented-control {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(15, 23, 42, 0.85);
+  padding: 4px;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  gap: 4px;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.segmented-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  white-space: nowrap;
+  user-select: none;
+}
+
+.segmented-tab svg {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  color: var(--text-muted);
+  transition: all 0.2s ease;
+}
+
+.segmented-tab:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.segmented-tab:hover svg {
+  color: var(--text-primary);
+  transform: translateY(-1px);
+}
+
+.segmented-tab.active {
+  background: rgba(30, 41, 59, 0.95);
+  color: var(--accent-primary);
+  border-color: rgba(88, 166, 255, 0.35);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35), 0 0 14px rgba(88, 166, 255, 0.12);
+}
+
+.segmented-tab.active svg {
+  color: var(--accent-primary);
+}
+
+/* Área de Conteúdo das Abas */
+.settings-tab-content {
+  padding: 24px;
+  flex: 1;
+}
+
+.settings-tab-pane {
+  display: none;
+  flex-direction: column;
+  gap: 20px;
+  animation: tabFadeIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.settings-tab-pane.active {
+  display: flex;
+}
+
+@keyframes tabFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Cabeçalho do Painel da Aba */
+.tab-pane-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.tab-pane-header-info {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  max-width: 720px;
+}
+
+.tab-pane-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 4px 0;
+  letter-spacing: -0.01em;
+}
+
+.tab-pane-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.tab-pane-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* Rodapé do Card Geral */
+.settings-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 24px;
+  background: rgba(13, 17, 23, 0.7);
+  border-top: 1px solid var(--border-subtle);
+  flex-wrap: wrap;
+}
+
+.settings-card-footer .footer-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.settings-card-footer .footer-info svg {
+  width: 18px;
+  height: 18px;
+  color: var(--accent-primary);
+  flex-shrink: 0;
+}
+
+.settings-card-footer .footer-buttons {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* ==========================================================
+   CARDS DE SEÇÃO (LEGACY & SUBCOMPONENTES)
    ========================================================== */
 
 .settings-card {

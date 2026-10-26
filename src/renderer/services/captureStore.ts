@@ -1,10 +1,14 @@
-import type {
-  CaptureFilterState,
-  CaptureRecord,
-  IVStats,
-  PokeballType,
-  PokemonQuality,
+import {
+  type CaptureFilterState,
+  type CaptureRecord,
+  type IVStats,
+  type PokeballType,
+  type PokemonQuality,
+  normalizePokeball,
+  qualityFromNumberOrString,
 } from '../../shared/captureTypes.js';
+import { DEFAULT_ACCOUNTS } from '../../shared/constants.js';
+import { MarketService } from './marketService.js';
 
 type CaptureListener = (
   captures: CaptureRecord[],
@@ -27,8 +31,15 @@ export class CaptureStore {
   private listeners = new Set<CaptureListener>();
   private isBatchScheduled = false;
 
+  // Governança de Requisições: por padrão inicia DESABILITADA quando o app for aberto
+  private requestsEnabled = false;
+  private requestsListeners = new Set<(enabled: boolean) => void>();
+
   private constructor() {
     this.loadFromStorage();
+    if (typeof window !== 'undefined') {
+      (window as any).__POKE_CAPTURES_REQUESTS_ENABLED__ = false;
+    }
   }
 
   public static getInstance(): CaptureStore {
@@ -36,6 +47,125 @@ export class CaptureStore {
       CaptureStore.instance = new CaptureStore();
     }
     return CaptureStore.instance;
+  }
+
+  public isRequestsEnabled(): boolean {
+    if (typeof window !== 'undefined' && typeof (window as any).__POKE_CAPTURES_REQUESTS_ENABLED__ === 'boolean') {
+      return this.requestsEnabled && (window as any).__POKE_CAPTURES_REQUESTS_ENABLED__;
+    }
+    return this.requestsEnabled;
+  }
+
+  public setRequestsEnabled(enabled: boolean): void {
+    this.requestsEnabled = !!enabled;
+    if (typeof window !== 'undefined') {
+      (window as any).__POKE_CAPTURES_REQUESTS_ENABLED__ = this.requestsEnabled;
+    }
+    for (const listener of this.requestsListeners) {
+      try {
+        listener(this.requestsEnabled);
+      } catch (err) {
+        console.error('[CaptureStore] Erro no listener de requisições:', err);
+      }
+    }
+  }
+
+  public onRequestsEnabledChange(listener: (enabled: boolean) => void): () => void {
+    this.requestsListeners.add(listener);
+    return () => {
+      this.requestsListeners.delete(listener);
+    };
+  }
+
+  /**
+   * Sincroniza o histórico oficial de capturas diretamente da API oficial do Poke Idle World
+   * Endpoint: https://poke.idleworld.online/api/game/capture-log?filter=all
+   *
+   * Operação EXCLUSIVAMENTE sob demanda / acionada manualmente pelo usuário.
+   */
+  public async syncFromApi(targetAccountId?: string): Promise<{ success: boolean; count: number; error?: string }> {
+    if (!this.isRequestsEnabled()) {
+      return {
+        success: false,
+        count: 0,
+        error: 'Requisições da tela de capturas estão pausadas. Habilite na tela de Ajustes para sincronizar.',
+      };
+    }
+
+    const marketSvc = MarketService.getInstance();
+    const accountsToSync = targetAccountId
+      ? DEFAULT_ACCOUNTS.filter((a) => a.id === targetAccountId)
+      : DEFAULT_ACCOUNTS;
+
+    const accountsWithToken = accountsToSync.filter((a) => !!marketSvc.getActiveAccountToken(a.id));
+    if (accountsWithToken.length === 0) {
+      return {
+        success: false,
+        count: 0,
+        error: 'Nenhuma conta possui token JWT ativo. Faça login no jogo para autenticar.',
+      };
+    }
+
+    let totalSynced = 0;
+
+    for (const acc of accountsToSync) {
+      // Revalida a permissão a cada chamada
+      if (!this.isRequestsEnabled()) {
+        break;
+      }
+
+      const token = marketSvc.getActiveAccountToken(acc.id);
+      if (!token) continue;
+
+      try {
+        const res = await fetch('https://poke.idleworld.online/api/game/capture-log?filter=all', {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: 'application/json',
+          },
+        });
+
+        if (!res.ok) continue;
+        const data = await res.json();
+        if (!data || !Array.isArray(data.rows) || data.rows.length === 0) continue;
+
+        const list = data.rows.map((row: any) => {
+          const ivPts = typeof row.ivTotal === 'number' ? row.ivTotal : 0;
+          const ivPct = ivPts > 0 ? Math.round((ivPts / 192) * 100 * 10) / 10 : 0;
+          const rawName = String(row.name || 'Pokémon').trim();
+          const cleanName = rawName.replace(/.*(?:Captura|selvagem|Loja|\d)+/gi, '').trim() || rawName;
+
+          let qMult: number | undefined = undefined;
+          if (typeof row.quality === 'number' && !isNaN(row.quality)) {
+            qMult = row.quality;
+          } else if (typeof row.qualityMultiplier === 'number' && !isNaN(row.qualityMultiplier)) {
+            qMult = row.qualityMultiplier;
+          }
+
+          return {
+            id: String(row.id || ''),
+            pokemonName: cleanName,
+            pokemonDexNumber: row.speciesId,
+            level: row.level || 1,
+            quality: qualityFromNumberOrString(row.quality),
+            qualityMultiplier: qMult,
+            pokeball: normalizePokeball(row.ballName || ''),
+            ivPoints: ivPts,
+            ivMaxPoints: 192,
+            ivPercentage: ivPct,
+            isShiny: Boolean(row.shiny),
+            timestamp: row.at ? new Date(row.at).getTime() : Date.now(),
+          };
+        });
+
+        this.syncCapturesBatch(acc.id, acc.name, list);
+        totalSynced += list.length;
+      } catch (err) {
+        console.warn(`[CaptureStore] Erro ao sincronizar capturas da conta ${acc.name}:`, err);
+      }
+    }
+
+    return { success: true, count: totalSynced };
   }
 
   /**

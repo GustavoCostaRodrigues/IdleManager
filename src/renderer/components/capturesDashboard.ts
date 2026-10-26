@@ -23,6 +23,7 @@ export class CapturesDashboardComponent {
   public readonly element: HTMLElement;
   private readonly store: CaptureStore;
   private unsubscribe?: () => void;
+  private unsubscribeRequests?: () => void;
 
   // Referências DOM
   private elTotalBadge!: HTMLElement;
@@ -34,6 +35,8 @@ export class CapturesDashboardComponent {
   private elIvSelect!: HTMLSelectElement;
   private elBtnResetFilters!: HTMLButtonElement;
   private elTableCounterBadge!: HTMLElement;
+  private btnSyncCaptures!: HTMLButtonElement;
+  private elRequestsBadge!: HTMLElement;
 
   private latestRenderedIds = new Set<string>();
 
@@ -49,7 +52,9 @@ export class CapturesDashboardComponent {
     this.renderInitialStructure();
     this.bindDomReferences();
     this.initEvents();
+    this.updateRequestsBadge();
     this.subscribeToStore();
+    this.subscribeToRequestsState();
   }
 
   private renderInitialStructure(): void {
@@ -57,18 +62,33 @@ export class CapturesDashboardComponent {
       <!-- CABEÇALHO DO DASHBOARD DE CAPTURAS -->
       <header class="captures-header">
         <div class="captures-header-left">
-          <div class="captures-badge-live">
-            <span class="captures-pulse-dot"></span>
-            <span>FEED EM TEMPO REAL</span>
+          <div class="captures-badges-row">
+            <div class="captures-badge-live">
+              <span class="captures-pulse-dot"></span>
+              <span>SINCRONIZAÇÃO SOB DEMANDA</span>
+            </div>
+            <div id="captures-requests-badge" class="captures-req-badge paused" title="Status das requisições ao histórico oficial de capturas (Ajustes)">
+              <span class="status-dot red"></span>
+              <span>Requisições Pausadas</span>
+            </div>
           </div>
           <h1 class="captures-title">
             Dashboard de Capturas & Qualidade
             <span id="captures-header-total" class="captures-title-counter">0 capturas</span>
           </h1>
-          <p class="captures-subtitle">Histórico de capturas unificado das 4 contas com classificação e filtros oficiais do Poke Idle World.</p>
+          <p class="captures-subtitle">Histórico oficial obtido via requisições HTTP manuais (GET /api/game/capture-log?filter=all) com classificação e filtros do Poke Idle World.</p>
         </div>
 
         <div class="captures-header-actions">
+          <button id="btn-sync-captures" class="btn-capture-action btn-sync-history" title="Faz requisição à API oficial do jogo para sincronizar histórico de capturas e IVs">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 2v6h-6"/>
+              <path d="M3 12a9 9 0 0 1 15-6.7L21 8"/>
+              <path d="M3 22v-6h6"/>
+              <path d="M21 12a9 9 0 0 1-15 6.7L3 16"/>
+            </svg>
+            <span>Sincronizar Capturas</span>
+          </button>
           <button id="btn-clear-captures" class="btn-capture-action btn-clear-history" title="Limpa todo o histórico de capturas salvo">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="3 6 5 6 21 6"/>
@@ -230,8 +250,8 @@ export class CapturesDashboardComponent {
                 <line x1="2" y1="12" x2="9" y2="12"/>
                 <line x1="15" y1="12" x2="22" y2="12"/>
               </svg>
-              <h3 class="captures-empty-title">Nenhuma captura registrada ainda</h3>
-              <p class="captures-empty-desc">Aguardando capturas reais das contas conectadas. Assim que um Pokémon for capturado no Poke Idle World em qualquer instância ativa, o registro com dados autênticos aparecerá aqui instantaneamente.</p>
+              <h3 class="captures-empty-title">Nenhum registro no histórico local</h3>
+              <p class="captures-empty-desc">O Dashboard de Capturas opera sob demanda para proteção da conta. Clique em "Sincronizar Capturas" acima para requisitar o histórico oficial na API do jogo.</p>
             </div>
           </div>
         </div>
@@ -249,10 +269,46 @@ export class CapturesDashboardComponent {
     this.elIvSelect = this.element.querySelector('#filter-select-iv') as HTMLSelectElement;
     this.elBtnResetFilters = this.element.querySelector('#btn-reset-filters') as HTMLButtonElement;
     this.elTableCounterBadge = this.element.querySelector('#captures-filtered-badge') as HTMLElement;
+    this.btnSyncCaptures = this.element.querySelector('#btn-sync-captures') as HTMLButtonElement;
+    this.elRequestsBadge = this.element.querySelector('#captures-requests-badge') as HTMLElement;
   }
 
   private initEvents(): void {
-    // 1. Filtro rápido de Qualidade Oficial (Pill Buttons)
+    // 1. Sincronizar Capturas via API Oficial
+    this.btnSyncCaptures?.addEventListener('click', async () => {
+      if (!this.store.isRequestsEnabled()) {
+        this.onShowToast?.(
+          'Requisições da tela de capturas estão pausadas. Habilite na tela de Ajustes para sincronizar.',
+          'info',
+        );
+        return;
+      }
+
+      this.btnSyncCaptures.classList.add('syncing');
+      this.btnSyncCaptures.disabled = true;
+      this.onShowToast?.('Buscando histórico oficial de capturas na API...', 'info');
+
+      try {
+        const res = await this.store.syncFromApi();
+        if (res.success) {
+          this.onShowToast?.(
+            `Sincronização concluída! ${res.count} registros verificados nas contas ativas.`,
+            'success',
+          );
+        } else {
+          this.onShowToast?.(res.error || 'Falha ao sincronizar capturas.', 'danger');
+        }
+      } catch (err: any) {
+        this.onShowToast?.(`Erro na requisição: ${err.message || err}`, 'danger');
+      } finally {
+        setTimeout(() => {
+          this.btnSyncCaptures.classList.remove('syncing');
+          this.btnSyncCaptures.disabled = false;
+        }, 800);
+      }
+    });
+
+    // 2. Filtro rápido de Qualidade Oficial (Pill Buttons)
     const pills = this.elPillsContainer.querySelectorAll<HTMLButtonElement>('.rarity-pill');
     pills.forEach((pill) => {
       pill.addEventListener('click', () => {
@@ -261,7 +317,7 @@ export class CapturesDashboardComponent {
       });
     });
 
-    // 2. Busca com debounce suave
+    // 3. Busca com debounce suave
     let searchTimeout: number | null = null;
     this.elSearchInput.addEventListener('input', () => {
       if (searchTimeout) window.clearTimeout(searchTimeout);
@@ -270,17 +326,17 @@ export class CapturesDashboardComponent {
       }, 150);
     });
 
-    // 3. Select de Conta
+    // 4. Select de Conta
     this.elAccountSelect.addEventListener('change', () => {
       this.store.setFilter({ accountId: this.elAccountSelect.value });
     });
 
-    // 4. Select de IV Mínimo
+    // 5. Select de IV Mínimo
     this.elIvSelect.addEventListener('change', () => {
       this.store.setFilter({ minIv: Number(this.elIvSelect.value) || 0 });
     });
 
-    // 5. Botão Resetar Filtros
+    // 6. Botão Resetar Filtros
     this.elBtnResetFilters.addEventListener('click', () => {
       this.store.resetFilter();
       this.elSearchInput.value = '';
@@ -289,13 +345,33 @@ export class CapturesDashboardComponent {
       this.onShowToast?.('Filtros de busca restaurados.', 'info');
     });
 
-    // 6. Botão Limpar Histórico
+    // 7. Botão Limpar Histórico
     const btnClear = this.element.querySelector('#btn-clear-captures');
     btnClear?.addEventListener('click', () => {
       if (confirm('Tem certeza de que deseja limpar todo o histórico de capturas registradas?')) {
         this.store.clearHistory();
         this.onShowToast?.('Histórico de capturas limpo.', 'info');
       }
+    });
+  }
+
+  private updateRequestsBadge(): void {
+    if (!this.elRequestsBadge) return;
+    const isEnabled = this.store.isRequestsEnabled();
+    if (isEnabled) {
+      this.elRequestsBadge.className = 'captures-req-badge active';
+      this.elRequestsBadge.innerHTML = `<span class="status-dot green"></span><span>Requisições Ativas</span>`;
+      this.elRequestsBadge.title = 'Requisições à API oficial de capturas ativadas';
+    } else {
+      this.elRequestsBadge.className = 'captures-req-badge paused';
+      this.elRequestsBadge.innerHTML = `<span class="status-dot red"></span><span>Requisições Pausadas</span>`;
+      this.elRequestsBadge.title = 'Requisições da tela de capturas desativadas. Ative na tela de Ajustes';
+    }
+  }
+
+  private subscribeToRequestsState(): void {
+    this.unsubscribeRequests = this.store.onRequestsEnabledChange(() => {
+      this.updateRequestsBadge();
     });
   }
 
@@ -625,5 +701,6 @@ export class CapturesDashboardComponent {
 
   public destroy(): void {
     this.unsubscribe?.();
+    this.unsubscribeRequests?.();
   }
 }

@@ -41,7 +41,8 @@ export class HuntClientService {
   private states = new Map<string, AccountHuntCardState>();
   private baselines = new Map<string, AccountBaseline>();
   private disabledAccountIds = new Set<string>();
-  private screenRequestsEnabled = true;
+  // Por padrão, TODAS AS REQUISIÇÕES DEVEM INICIAR DESABILITADAS quando o app for aberto.
+  private screenRequestsEnabled = false;
   private tokenUnsubscribe: (() => void) | null = null;
   private timers: Record<string, any> = {};
   private nextCheckTimes: Record<string, number> = {};
@@ -66,12 +67,8 @@ export class HuntClientService {
   }
 
   private loadScreenRequestsEnabled(): void {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY_SCREEN_REQUESTS_ENABLED);
-      if (saved !== null) {
-        this.screenRequestsEnabled = saved !== 'false';
-      }
-    } catch (_) {}
+    // Por padrão, TODAS AS REQUISIÇÕES DEVEM INICIAR DESABILITADAS quando o app for aberto.
+    this.screenRequestsEnabled = false;
   }
 
   public isScreenRequestsEnabled(): boolean {
@@ -99,28 +96,41 @@ export class HuntClientService {
         state.syncError = 'Requisições da tela desativadas';
       }
     } else {
-      // Reativa as requisições para contas habilitadas
-      for (const state of this.states.values()) {
-        if (state.syncError === 'Requisições da tela desativadas') {
-          state.syncError = null;
+      // Se todas as contas estavam desabilitadas por padrão, habilita-as para conveniência
+      if (this.disabledAccountIds.size === DEFAULT_ACCOUNTS.length) {
+        this.enableAllAccountsRequests();
+      } else {
+        // Reativa as requisições para contas habilitadas
+        for (const state of this.states.values()) {
+          if (state.syncError === 'Requisições da tela desativadas') {
+            state.syncError = this.isAccountRequestsEnabled(state.accountId) ? null : 'Requisições desativadas';
+          }
         }
+        this.startDesynchronizedLoops();
       }
-      this.startDesynchronizedLoops();
     }
 
     this.notify();
   }
 
-  private loadDisabledAccounts(): void {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY_DISABLED_ACCOUNTS);
-      if (raw) {
-        const list = JSON.parse(raw);
-        if (Array.isArray(list)) {
-          this.disabledAccountIds = new Set(list);
-        }
+  public enableAllAccountsRequests(): void {
+    this.disabledAccountIds.clear();
+    this.saveDisabledAccounts();
+    for (const state of this.states.values()) {
+      state.requestsEnabled = true;
+      if (state.syncError === 'Requisições desativadas' || state.syncError === 'Requisições da tela desativadas') {
+        state.syncError = null;
       }
-    } catch (_) {}
+    }
+    if (this.screenRequestsEnabled) {
+      this.startDesynchronizedLoops();
+    }
+    this.notify();
+  }
+
+  private loadDisabledAccounts(): void {
+    // Por padrão, TODAS AS REQUISIÇÕES DEVEM INICIAR DESABILITADAS quando o app for aberto.
+    this.disabledAccountIds = new Set(DEFAULT_ACCOUNTS.map((a) => a.id));
   }
 
   private saveDisabledAccounts(): void {
@@ -210,7 +220,9 @@ export class HuntClientService {
         loots: [],
         totalHuntDollar: 0,
         lastSyncTime: null,
-        syncError: isReqEnabled ? null : 'Requisições desativadas',
+        syncError: !this.screenRequestsEnabled
+          ? 'Requisições da tela desativadas'
+          : (isReqEnabled ? null : 'Requisições desativadas'),
         isSyncing: false,
         nextCheckSeconds: 0,
       });

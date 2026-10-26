@@ -91,6 +91,14 @@ export class HuntDashboardComponent {
 
   private initEvents(): void {
     this.btnRefreshAll?.addEventListener('click', async () => {
+      if (!this.service.isScreenRequestsEnabled()) {
+        this.onShowToast?.(
+          'Requisições do Dashboard da Hunt estão desativadas. Habilite na tela de Ajustes para fazer requisições.',
+          'info',
+        );
+        return;
+      }
+
       if (this.isRefreshingAll) return;
       this.isRefreshingAll = true;
       this.btnRefreshAll.classList.add('syncing');
